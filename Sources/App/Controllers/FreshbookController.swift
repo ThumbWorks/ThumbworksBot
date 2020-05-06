@@ -12,29 +12,9 @@ extension URL {
     static let freshbooksAuth = URL(string: "https://api.freshbooks.com/auth/oauth/token")!
     static let freshbooksUser = URL(string: "https://api.freshbooks.com/auth/api/v1/users/me")!
 }
-struct AuthRequest: Content {
-    let code: String
-}
 
-struct NewWebookResponseCallback: Content {
-    let event: String
-    let uri: String
-    let callbackID: Int
-    let id: Int
-    let verified: Bool
-}
-struct NewWebhookCallback: Content {
-    let event: String
-    let uri: String
-}
-struct CreateWebhookRequestPayload: Content {
-    var callback: NewWebhookCallback
-}
-struct IncomingWebhookPayload: Content {
-    var githubTeam: String
-    var swaggerSpecURL: String
-}
 
+// Erros
 enum FreshbooksError: Error {
     case invalidURL
 }
@@ -53,9 +33,7 @@ final class FreshbooksController {
         self.callbackHost = callbackHost
     }
 
-    struct FreshbooksWebhookResponse: Encodable {
-        let name: String
-    }
+
 
     func index(_ req: Request) throws -> EventLoopFuture<View> {
         return try req.view().render("UserWebhooks", FreshbooksWebhookResponse(name: "roddy"))
@@ -142,6 +120,8 @@ extension EventLoopFuture where T == TokenExchangeResponse {
     }
 }
 
+// Mark network models
+
 struct UserFetchRequest: Content {
     let accessToken: String
     enum CodingKeys: String, CodingKey {
@@ -194,4 +174,31 @@ struct TokenExchangeRequest: Content {
         case clientID = "client_id"
         case code = "code"
     }
+}
+
+struct AuthRequest: Content {
+    let code: String
+}
+
+struct NewWebookResponseCallback: Content {
+    let event: String
+    let uri: String
+    let callbackID: Int
+    let id: Int
+    let verified: Bool
+}
+struct NewWebhookCallback: Content {
+    let event: String
+    let uri: String
+}
+struct CreateWebhookRequestPayload: Content {
+    var callback: NewWebhookCallback
+}
+struct IncomingWebhookPayload: Content {
+    var githubTeam: String
+    var swaggerSpecURL: String
+}
+
+struct FreshbooksWebhookResponse: Encodable {
+    let name: String
 }
