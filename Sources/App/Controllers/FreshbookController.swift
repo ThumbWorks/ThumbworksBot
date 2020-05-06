@@ -6,6 +6,7 @@
 //
 
 import Vapor
+import Leaf
 
 struct AuthRequest: Content {
     let code: String
@@ -47,8 +48,14 @@ final class FreshbooksController {
         self.clientSecret = clientSecret
         self.callbackHost = callbackHost
     }
-    func index(_ req: Request) throws -> HTTPStatus {
-        return .ok
+
+    struct TestData: Encodable {
+        let name: String
+    }
+
+    func index(_ req: Request) throws -> EventLoopFuture<View> {
+
+        return try req.view().render("UserWebhooks", TestData(name: "roddy"))
     }
 
     func registerNewWebhook(_ req: Request) throws -> EventLoopFuture<Response> {

@@ -26,6 +26,7 @@ public func routes(_ router: Router) throws {
 
     let freshbooksController = FreshbooksController(clientID: client_id, clientSecret: client_secret, callbackHost: localhost)
     router.post("webhook", use: freshbooksController.webhook)
+    router.get("webhook", use: freshbooksController.index)
     router.post("registerNewWebhook", use: freshbooksController.registerNewWebhook)
     router.post("webhook/ready", use: freshbooksController.webhookReady)
     router.get("freshbooks/auth", use: freshbooksController.freshbooksAuth)
