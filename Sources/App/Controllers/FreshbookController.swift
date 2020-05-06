@@ -8,6 +8,10 @@
 import Vapor
 import Leaf
 
+extension URL {
+    static let freshbooksAuth = URL(string: "https://api.freshbooks.com/auth/oauth/token")!
+    static let freshbooksUser = URL(string: "https://api.freshbooks.com/auth/api/v1/users/me")!
+}
 struct AuthRequest: Content {
     let code: String
 }
@@ -49,13 +53,12 @@ final class FreshbooksController {
         self.callbackHost = callbackHost
     }
 
-    struct TestData: Encodable {
+    struct FreshbooksWebhookResponse: Encodable {
         let name: String
     }
 
     func index(_ req: Request) throws -> EventLoopFuture<View> {
-
-        return try req.view().render("UserWebhooks", TestData(name: "roddy"))
+        return try req.view().render("UserWebhooks", FreshbooksWebhookResponse(name: "roddy"))
     }
 
     func registerNewWebhook(_ req: Request) throws -> EventLoopFuture<Response> {
@@ -88,24 +91,17 @@ final class FreshbooksController {
     func accessToken(_ req: Request) throws -> HTTPStatus {
         let codeContainer = try req.query.decode(AuthRequest.self)
         print("the access token at the end of the flow is \(codeContainer.code)")
-          return .ok
-      }
+        return .ok
+    }
 
-
-    func freshbooksAuth(_ req: Request) throws -> EventLoopFuture<TokenExchangeResponse> {
-        let codeContianer = try req.query.decode(AuthRequest.self)
-        print("we got a code from freshbooks because someone started the oauth flow \(codeContianer.code)")
-        guard let url = URL(string: "https://api.freshbooks.com/auth/oauth/token") else {
-            throw FreshbooksError.invalidURL
-        }
-
+    private func exchangeToken(with code: String, on req: Request) throws -> EventLoopFuture<TokenExchangeResponse>{
         return try TokenExchangeRequest(clientSecret: clientSecret,
                                         redirectURI: URL(string: "\(callbackHost)/freshbooks/auth"),
                                         clientID: clientID,
-                                        code: codeContianer.code)
+                                        code: code)
             .encode(using: req)
             .flatMap { tokenRequest -> EventLoopFuture<TokenExchangeResponse> in
-                return try req.client().post(url) { request in
+                return try req.client().post(URL.freshbooksAuth) { request in
                     request.http.contentType = .json
                     print(tokenRequest.http.body)
                     request.http.body = tokenRequest.http.body
@@ -115,6 +111,55 @@ final class FreshbooksController {
                     print(response)
                 })
         }
+    }
+    func freshbooksAuth(_ req: Request) throws -> EventLoopFuture<View> {
+        let codeContainer = try req.query.decode(AuthRequest.self)
+        print("we got a code from freshbooks because someone started the oauth flow \(codeContainer.code)")
+        return try exchangeToken(with: codeContainer.code, on: req)
+            .fetchAuthenticatedUser(on: req)
+            .showUserWebhookView(on: req)
+    }
+}
+
+extension EventLoopFuture where T == UserFetchResponse {
+    func showUserWebhookView(on req: Request) throws -> EventLoopFuture<View> {
+        flatMap { try req.view().render("UserWebhooks", $0.response) }
+    }
+}
+
+extension EventLoopFuture where T == TokenExchangeResponse {
+    func fetchAuthenticatedUser(on req: Request) throws ->  EventLoopFuture<UserFetchResponse> {
+        flatMap { (tokenExchangeResponse) -> EventLoopFuture<UserFetchResponse> in
+            try UserFetchRequest(accessToken: tokenExchangeResponse.accessToken).encode(for: req).flatMap { userFetchResponse -> EventLoopFuture<UserFetchResponse> in
+                return try req.client().get(URL.freshbooksUser) { userRequest in
+                    userRequest.http.contentType = .json
+                    userRequest.http.headers.add(name: "Api-Version", value: "alpha")
+                    userRequest.http.headers.add(name: .authorization, value: "Bearer \(tokenExchangeResponse.accessToken)")
+                }.flatMap { try $0.content.decode(UserFetchResponse.self) }
+            }
+        }
+
+    }
+}
+
+struct UserFetchRequest: Content {
+    let accessToken: String
+    enum CodingKeys: String, CodingKey {
+        case accessToken = "access_token"
+    }
+}
+
+struct UserFetchResponse: Content {
+    let response: UserResponseObject
+}
+struct UserResponseObject: Content {
+    let id: Int
+    let firstName: String
+    let lastName: String
+    enum CodingKeys: String, CodingKey {
+           case firstName = "first_name"
+           case lastName = "last_name"
+           case id
     }
 }
 
