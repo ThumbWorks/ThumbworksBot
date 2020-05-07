@@ -1,4 +1,6 @@
 import Vapor
+import Authentication
+import FluentSQLite
 
 enum RouterError: Error {
     case noClientIDSetInEnvironment
@@ -6,35 +8,31 @@ enum RouterError: Error {
 }
 /// Register your application's routes here.
 public func routes(_ router: Router) throws {
-    // Basic "It works" example
-    router.get { req in
-        return "It works!"
-    }   
-    
-    // Basic "Hello, world!" example
-    router.get("hello") { req in
-        return "Hello, world!"
-    }
-
-    let localhost = "https://156ace05.ngrok.io"
-    guard let client_id = Environment.get("thumbworksbot_app_freshbooks_client_id") else {
-        throw RouterError.noClientIDSetInEnvironment
-    }
-    guard let client_secret = Environment.get("thumbworksbot_app_freshbooks_secret") else {
-        throw RouterError.noClientSecretSetInEnvironment
-    }
+    let localhost = "https://thumbworksbot.ngrok.io"
+       guard let client_id = Environment.get("thumbworksbot_app_freshbooks_client_id") else {
+           throw RouterError.noClientIDSetInEnvironment
+       }
+       guard let client_secret = Environment.get("thumbworksbot_app_freshbooks_secret") else {
+           throw RouterError.noClientSecretSetInEnvironment
+       }
 
     let freshbooksController = FreshbooksController(clientID: client_id, clientSecret: client_secret, callbackHost: localhost)
+    let userController = UserController()
+
+    // The logged out view linking to the oauth flow
+    router.get { req in
+        return try req.view().render("Landing", ["client_id" : client_id])
+    }
+
     router.post("webhook", use: freshbooksController.webhook)
     router.get("webhook", use: freshbooksController.index)
     router.post("registerNewWebhook", use: freshbooksController.registerNewWebhook)
     router.post("webhook/ready", use: freshbooksController.webhookReady)
-    router.get("freshbooks/auth", use: freshbooksController.freshbooksAuth)
     router.get("freshbooks/token", use: freshbooksController.accessToken)
 
-    // Example of configuring a controller
-    let todoController = TodoController()
-    router.get("todos", use: todoController.index)
-    router.post("todos", use: todoController.create)
-    router.delete("todos", Todo.parameter, use: todoController.delete)
+    let session = User.authSessionsMiddleware()
+    let authenticatedUserGroup = router.grouped(session)
+    authenticatedUserGroup.get("freshbooks/auth", use: freshbooksController.freshbooksAuth)
+    authenticatedUserGroup.get("user/webhooks", use: userController.webhooks)
+
 }

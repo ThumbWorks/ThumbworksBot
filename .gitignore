@@ -6,3 +6,5 @@ DerivedData/
 .DS_Store
 .swiftpm
 db.sqlite
+Package.resolved
+g

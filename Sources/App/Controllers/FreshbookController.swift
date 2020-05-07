@@ -7,7 +7,8 @@
 
 import Vapor
 import Leaf
-
+import FluentSQLite
+import AuthenticationServices
 extension URL {
     static let freshbooksAuth = URL(string: "https://api.freshbooks.com/auth/oauth/token")!
     static let freshbooksUser = URL(string: "https://api.freshbooks.com/auth/api/v1/users/me")!
@@ -17,6 +18,7 @@ extension URL {
 // Erros
 enum FreshbooksError: Error {
     case invalidURL
+    case noAccessTokenFound
 }
 
 
@@ -32,8 +34,6 @@ final class FreshbooksController {
         self.clientSecret = clientSecret
         self.callbackHost = callbackHost
     }
-
-
 
     func index(_ req: Request) throws -> EventLoopFuture<View> {
         return try req.view().render("UserWebhooks", FreshbooksWebhookResponse(name: "roddy"))
@@ -69,6 +69,7 @@ final class FreshbooksController {
     func accessToken(_ req: Request) throws -> HTTPStatus {
         let codeContainer = try req.query.decode(AuthRequest.self)
         print("the access token at the end of the flow is \(codeContainer.code)")
+        try req.session()["accessToken"] = codeContainer.code
         return .ok
     }
 
@@ -85,38 +86,65 @@ final class FreshbooksController {
                     request.http.body = tokenRequest.http.body
                 }.flatMap { tokenExchangeResponse -> EventLoopFuture<TokenExchangeResponse> in
                     return try tokenExchangeResponse.content.decode(TokenExchangeResponse.self)
-                }.do({ response in
-                    print(response)
-                })
+                }
         }
     }
     func freshbooksAuth(_ req: Request) throws -> EventLoopFuture<View> {
         let codeContainer = try req.query.decode(AuthRequest.self)
         print("we got a code from freshbooks because someone started the oauth flow \(codeContainer.code)")
         return try exchangeToken(with: codeContainer.code, on: req)
-            .fetchAuthenticatedUser(on: req)
+            .generateGetUserRequest(on: req)
+            .queryUser(on: req)
             .showUserWebhookView(on: req)
     }
 }
 
 extension EventLoopFuture where T == UserFetchResponse {
-    func showUserWebhookView(on req: Request) throws -> EventLoopFuture<View> {
-        flatMap { try req.view().render("UserWebhooks", $0.response) }
+
+
+    func queryUser(on req: Request) throws -> EventLoopFuture<User> {
+        flatMap { userResponse -> EventLoopFuture<User> in
+            return User.query(on: req).filter(\.freshbooksID == userResponse.response.id).first().flatMap { user in
+                let savableUser: User
+                if let user = user {
+                    // If yes, update
+                    savableUser = user
+                    savableUser.updateUser(responseObject: userResponse.response)
+                } else {
+                    // If no, create
+                    savableUser = User(responseObject: userResponse.response)
+                }
+                // try req.authenticate(savableUser)
+                try req.authenticateSession(savableUser)
+                return savableUser.save(on: req)
+            }
+        }
     }
 }
 
+extension EventLoopFuture where T == User {
+    func showUserWebhookView(on req: Request) throws -> EventLoopFuture<View> {
+           flatMap { try req.view().render("UserWebhooks", $0) }
+       }
+}
+
 extension EventLoopFuture where T == TokenExchangeResponse {
-    func fetchAuthenticatedUser(on req: Request) throws ->  EventLoopFuture<UserFetchResponse> {
+    func generateGetUserRequest(on req: Request) throws ->  EventLoopFuture<UserFetchResponse> {
         flatMap { (tokenExchangeResponse) -> EventLoopFuture<UserFetchResponse> in
-            try UserFetchRequest(accessToken: tokenExchangeResponse.accessToken).encode(for: req).flatMap { userFetchResponse -> EventLoopFuture<UserFetchResponse> in
-                return try req.client().get(URL.freshbooksUser) { userRequest in
-                    userRequest.http.contentType = .json
-                    userRequest.http.headers.add(name: "Api-Version", value: "alpha")
-                    userRequest.http.headers.add(name: .authorization, value: "Bearer \(tokenExchangeResponse.accessToken)")
-                }.flatMap { try $0.content.decode(UserFetchResponse.self) }
+            try req.session()["accessToken"] = tokenExchangeResponse.accessToken
+
+            return try UserFetchRequest(accessToken: tokenExchangeResponse.accessToken).encode(for: req)
+                .flatMap { userFetchResponse -> EventLoopFuture<UserFetchResponse> in
+                    return try req.client().get(URL.freshbooksUser) { userRequest in
+                        userRequest.http.contentType = .json
+                        userRequest.http.headers.add(name: "Api-Version", value: "alpha")
+                        userRequest.http.headers.add(name: .authorization, value: "Bearer \(tokenExchangeResponse.accessToken)")
+                    }.flatMap { userFetchResponse in
+                        let userFetchResponseObject = try userFetchResponse.content.decode(UserFetchResponse.self)
+                        return userFetchResponseObject
+                    }
             }
         }
-
     }
 }
 
@@ -131,16 +159,6 @@ struct UserFetchRequest: Content {
 
 struct UserFetchResponse: Content {
     let response: UserResponseObject
-}
-struct UserResponseObject: Content {
-    let id: Int
-    let firstName: String
-    let lastName: String
-    enum CodingKeys: String, CodingKey {
-           case firstName = "first_name"
-           case lastName = "last_name"
-           case id
-    }
 }
 
 struct TokenExchangeResponse: Content {
@@ -201,4 +219,15 @@ struct IncomingWebhookPayload: Content {
 
 struct FreshbooksWebhookResponse: Encodable {
     let name: String
+}
+
+struct UserResponseObject: Content {
+    let id: Int
+    let firstName: String
+    let lastName: String
+    enum CodingKeys: String, CodingKey {
+           case firstName = "first_name"
+           case lastName = "last_name"
+           case id
+    }
 }

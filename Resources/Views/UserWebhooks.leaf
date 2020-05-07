@@ -1,4 +1,39 @@
 <html>
+<script>
+function loadTriggers() {
+
+    fetch('/user/webhooks')
+    .then((response) => {
+      return response.json();
+    })
+    .then((triggers) => {
+      for (i = 0; i < triggers.length; i++) {
+        var trigger = triggers[i]
+        var table = document.getElementById("triggertable");
+    
+        var row = document.createElement("TR");
+        // a name for looking up the thing we will delete from the table later
+        row.id = "trigger-"+trigger.id 
+    
+        table.appendChild(row);
+        row.insertCell(0).innerHTML = trigger.swaggerRepo
+        row.insertCell(1).innerHTML = trigger.gitRepo
+        
+        var checkbox = document.createElement("INPUT");
+        checkbox.setAttribute("type", "checkbox");
+        checkbox.id = trigger.id
+        checkbox.name = "deletionCheckbox"
+        var td = document.createElement('td');
+        td.style.width = '80px';
+        td.style.alignContent = "center";
+        td.appendChild(checkbox)
+        row.appendChild(td);    
+      }
+    });
+    }
+    </script>
+
 🐔 hello #(first_name)
+<a href = "/user/webhooks">webhooks</a>
 </html>
 

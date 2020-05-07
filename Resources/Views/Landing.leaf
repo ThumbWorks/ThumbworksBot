@@ -1,0 +1,5 @@
+
+<html>
+logged out
+<a href = "https://auth.freshbooks.com/service/auth/oauth/authorize?client_id=#(client_id)&response_type=code&redirect_uri=https://thumbworksbot.ngrok.io/freshbooks/auth"> Login </a>
+</html>
