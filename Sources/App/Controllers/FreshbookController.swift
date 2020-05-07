@@ -36,7 +36,7 @@ final class FreshbooksController {
     }
 
     func index(_ req: Request) throws -> EventLoopFuture<View> {
-        return try req.view().render("UserWebhooks", FreshbooksWebhookResponse(name: "roddy"))
+        return try req.view().render("UserWebhooks")
     }
 
     func registerNewWebhook(_ req: Request) throws -> EventLoopFuture<Response> {
@@ -99,7 +99,7 @@ final class FreshbooksController {
     }
 }
 
-extension EventLoopFuture where T == UserFetchResponse {
+extension EventLoopFuture where T == UserFetchResponsePayload {
 
 
     func queryUser(on req: Request) throws -> EventLoopFuture<User> {
@@ -129,18 +129,21 @@ extension EventLoopFuture where T == User {
 }
 
 extension EventLoopFuture where T == TokenExchangeResponse {
-    func generateGetUserRequest(on req: Request) throws ->  EventLoopFuture<UserFetchResponse> {
-        flatMap { (tokenExchangeResponse) -> EventLoopFuture<UserFetchResponse> in
+    func generateGetUserRequest(on req: Request) throws ->  EventLoopFuture<UserFetchResponsePayload> {
+        flatMap { (tokenExchangeResponse) -> EventLoopFuture<UserFetchResponsePayload> in
             try req.session()["accessToken"] = tokenExchangeResponse.accessToken
 
             return try UserFetchRequest(accessToken: tokenExchangeResponse.accessToken).encode(for: req)
-                .flatMap { userFetchResponse -> EventLoopFuture<UserFetchResponse> in
+                .flatMap { userFetchResponse -> EventLoopFuture<UserFetchResponsePayload> in
                     return try req.client().get(URL.freshbooksUser) { userRequest in
                         userRequest.http.contentType = .json
                         userRequest.http.headers.add(name: "Api-Version", value: "alpha")
                         userRequest.http.headers.add(name: .authorization, value: "Bearer \(tokenExchangeResponse.accessToken)")
                     }.flatMap { userFetchResponse in
-                        let userFetchResponseObject = try userFetchResponse.content.decode(UserFetchResponse.self)
+                        let userFetchResponseObject = try userFetchResponse.content.decode(UserFetchResponsePayload.self)
+                        userFetchResponseObject.do { payload in
+                            print("payload \(payload)")
+                        }
                         return userFetchResponseObject
                     }
             }
@@ -157,7 +160,7 @@ struct UserFetchRequest: Content {
     }
 }
 
-struct UserFetchResponse: Content {
+struct UserFetchResponsePayload: Content {
     let response: UserResponseObject
 }
 
@@ -217,17 +220,32 @@ struct IncomingWebhookPayload: Content {
     var swaggerSpecURL: String
 }
 
-struct FreshbooksWebhookResponse: Encodable {
-    let name: String
-}
 
 struct UserResponseObject: Content {
     let id: Int
     let firstName: String
     let lastName: String
+    let businessMemberships: [MembershipPayload]
     enum CodingKeys: String, CodingKey {
-           case firstName = "first_name"
-           case lastName = "last_name"
-           case id
+        case firstName = "first_name"
+        case lastName = "last_name"
+        case id
+        case businessMemberships = "business_memberships"
+    }
+}
+
+struct MembershipPayload: Content {
+    let id: Int
+    let role: String
+    let business: BusinessPayload
+}
+
+struct BusinessPayload: Content {
+    let id: Int
+    let name: String
+    let accountID: String?
+    enum CodingKeys: String, CodingKey {
+        case id, name
+        case accountID = "account_id"
     }
 }

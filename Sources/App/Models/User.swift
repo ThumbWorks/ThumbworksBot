@@ -13,13 +13,16 @@ final class User: SQLiteModel, Codable {
     var freshbooksID: Int
     var firstName: String
     var lastName: String
+    var businessMemberships: [MembershipPayload]
     init(responseObject: UserResponseObject) {
+        businessMemberships = responseObject.businessMemberships
         freshbooksID = responseObject.id
         firstName = responseObject.firstName
         lastName = responseObject.lastName
     }
 
     func updateUser(responseObject: UserResponseObject) {
+        businessMemberships = responseObject.businessMemberships
         freshbooksID = responseObject.id
         firstName = responseObject.firstName
         lastName = responseObject.lastName

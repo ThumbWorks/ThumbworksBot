@@ -1,12 +1,21 @@
 <html>
-<script>
-function loadTriggers() {
 
-    fetch('/user/webhooks')
+<script>
+window.onload = function() {
+  loadWebhooks()
+};
+function loadWebhooks() {
+
+    fetch('/user/webhooks', {
+    headers: {
+    'Content-Type': 'application/json'
+    }
+    })
     .then((response) => {
       return response.json();
     })
     .then((triggers) => {
+      console.log(triggers)
       for (i = 0; i < triggers.length; i++) {
         var trigger = triggers[i]
         var table = document.getElementById("triggertable");
@@ -31,9 +40,12 @@ function loadTriggers() {
       }
     });
     }
+
     </script>
+<body onload="loadWebhooks()">
 
 🐔 hello #(first_name)
 <a href = "/user/webhooks">webhooks</a>
+</body>
 </html>
 
