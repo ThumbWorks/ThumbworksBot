@@ -1,0 +1,7 @@
+
+<html>
+<script>
+window.location.href = "/user/webhooks";
+</script>
+Click  <a href="/user/webhooks">here</a> to continue to your webhooks
+</html>

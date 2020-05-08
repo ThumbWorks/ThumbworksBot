@@ -124,8 +124,10 @@ extension EventLoopFuture where T == UserFetchResponsePayload {
 
 extension EventLoopFuture where T == User {
     func showUserWebhookView(on req: Request) throws -> EventLoopFuture<View> {
-           flatMap { try req.view().render("UserWebhooks", $0) }
-       }
+        return flatMap { _ in
+            return try req.view().render("SetCookie")
+        }
+    }
 }
 
 extension EventLoopFuture where T == TokenExchangeResponse {

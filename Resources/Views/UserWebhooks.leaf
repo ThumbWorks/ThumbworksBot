@@ -1,5 +1,7 @@
 <html>
-
+<head>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
+</head>
 <script>
 window.onload = function() {
   loadWebhooks()
@@ -43,9 +45,35 @@ function loadWebhooks() {
 
     </script>
 <body onload="loadWebhooks()">
+    <div class="container-fluid">
+        
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>id</th>
+                    <th>verified</th>
+                    <th>url</th>
+                    <th>event</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td scope="row">a</td>
+                    <td>a</td>
+                    <td>b</td>
+                    <td>c</td>
+                </tr>
+                <tr>
+                    <td scope="row">a</td>
+                    <td>e</td>
+                    <td>d</td>
+                    <td>c</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 
 🐔 hello #(first_name)
-<a href = "/user/webhooks">webhooks</a>
 </body>
 </html>
 
