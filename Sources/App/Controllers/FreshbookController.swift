@@ -15,7 +15,7 @@ extension URL {
 }
 
 
-// Erros
+// Errors
 enum FreshbooksError: Error {
     case invalidURL
     case noAccessTokenFound
@@ -39,30 +39,7 @@ final class FreshbooksController {
         return try req.view().render("UserWebhooks")
     }
 
-    func registerNewWebhook(_ req: Request) throws -> EventLoopFuture<Response> {
-        let client = try req.client()
-
-        let account_id = "something we haven't gotten yet"
-        let callback = NewWebhookCallback(event: "invoice.create", uri: "\(callbackHost)/webhook/ready")
-        let requestPayload = CreateWebhookRequestPayload(callback: callback)
-        guard let url = URL(string: "https://api.freshbooks.com/events/account/\(account_id)/events/callbacks") else {
-            throw FreshbooksError.invalidURL
-        }
-
-
-        return try requestPayload.encode(using: req).flatMap { request -> EventLoopFuture<Response> in
-            let body = request.http.body
-            return client.post(url, headers: [:]) { request in
-                request.http.body = body
-            }
-        }
-    }
-
     func webhook(_ req: Request) throws -> HTTPStatus {
-        return .ok
-    }
-
-    func webhookReady(_ req: Request) throws -> HTTPStatus {
         return .ok
     }
 
@@ -109,10 +86,10 @@ extension EventLoopFuture where T == UserFetchResponsePayload {
                 if let user = user {
                     // If yes, update
                     savableUser = user
-                    savableUser.updateUser(responseObject: userResponse.response)
+                    savableUser.updateUser(responseObject: userResponse.response, accessToken: try req.session()["accessToken"] ?? "")
                 } else {
                     // If no, create
-                    savableUser = User(responseObject: userResponse.response)
+                    savableUser = User(responseObject: userResponse.response, accessToken: try req.session()["accessToken"] ?? "")
                 }
                 // try req.authenticate(savableUser)
                 try req.authenticateSession(savableUser)
@@ -221,7 +198,6 @@ struct IncomingWebhookPayload: Content {
     var githubTeam: String
     var swaggerSpecURL: String
 }
-
 
 struct UserResponseObject: Content {
     let id: Int

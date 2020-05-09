@@ -10,22 +10,25 @@ import Authentication
 import FluentSQLite
 final class User: SQLiteModel, Codable {
     var id: Int?
+    var accessToken: String
     var freshbooksID: Int
     var firstName: String
     var lastName: String
     var businessMemberships: [MembershipPayload]
-    init(responseObject: UserResponseObject) {
+    init(responseObject: UserResponseObject, accessToken: String) {
         businessMemberships = responseObject.businessMemberships
         freshbooksID = responseObject.id
         firstName = responseObject.firstName
         lastName = responseObject.lastName
+        self.accessToken = accessToken
     }
 
-    func updateUser(responseObject: UserResponseObject) {
+    func updateUser(responseObject: UserResponseObject, accessToken: String) {
         businessMemberships = responseObject.businessMemberships
         freshbooksID = responseObject.id
         firstName = responseObject.firstName
         lastName = responseObject.lastName
+        self.accessToken = accessToken
     }
 }
 extension User: SessionAuthenticatable { }
