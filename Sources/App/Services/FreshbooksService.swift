@@ -7,7 +7,7 @@
 
 import Vapor
 
-
+/// @mockable
 protocol FreshbooksWebServicing {
     func deleteWebhook(accountID: String, on req: Request) throws -> EventLoopFuture<Response>
     func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<Response>
@@ -21,11 +21,11 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
     init(hostname: String) {
         self.hostname = hostname
     }
-    
+
     func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<HTTPStatus> {
         let client = try req.client()
         return try req.content.decode(FreshbooksReadyPayload.self).flatMap { payload in
-            
+
             guard let url = URL(string: "https://api.freshbooks.com/events/account/\(payload.accountID)/events/callbacks/\(payload.objectID)") else {
                 throw FreshbooksError.invalidURL
             }
@@ -40,7 +40,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
             }
         }
     }
-    
+
     func deleteWebhook(accountID: String, on req: Request) throws -> EventLoopFuture<Response> {
         let client = try req.client()
         guard let accessToken = try req.session()["accessToken"] else {

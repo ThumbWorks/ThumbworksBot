@@ -7,6 +7,7 @@
 
 import Vapor
 
+/// @mockable
 protocol SlackWebServicing {
     func sendSlackPayload(on req: Request) throws -> EventLoopFuture<HTTPStatus>
     var req: Request? { get set }
