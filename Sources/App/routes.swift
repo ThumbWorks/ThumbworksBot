@@ -9,7 +9,7 @@ enum RouterError: Error {
 }
 /// Register your application's routes here.
 public func routes(_ router: Router) throws {
-    let localhost = "https://thumbworksbot.ngrok.io"
+    let hostname = "https://thumbworksbot.ngrok.io"
        guard let clientID = Environment.get("thumbworksbot_app_freshbooks_client_id") else {
            throw RouterError.missingClientID
        }
@@ -20,8 +20,10 @@ public func routes(_ router: Router) throws {
         throw RouterError.missingSlackURL
     }
 
-    let freshbooksController = FreshbooksController(clientID: clientID, clientSecret: clientSecret, callbackHost: localhost)
-    let webhookController = WebhookController(hostName: localhost, slackURL: slackMessageURL)
+    let slack = SlackWebService(slackURL: slackMessageURL)
+    let freshbooksController = FreshbooksController(clientID: clientID, clientSecret: clientSecret, callbackHost: hostname)
+    let freshbookService = FreshbooksWebservice(hostname: hostname)
+    let webhookController = WebhookController(hostName: hostname, slackService: slack, freshbooksService: freshbookService)
 
     // The logged out view linking to the oauth flow
     router.get { req in

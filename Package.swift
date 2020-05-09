@@ -22,7 +22,7 @@ let package = Package(
     targets: [
         .target(name: "App", dependencies: ["Leaf","FluentSQLite", "Vapor", "Authentication"]),
         .target(name: "Run", dependencies: ["App"]),
-        .testTarget(name: "AppTests", dependencies: ["App"])
+        .testTarget(name: "AppTests", dependencies: ["App", "Vapor"])
     ]
 )
 
