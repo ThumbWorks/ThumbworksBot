@@ -1,1 +1,1 @@
-./bin/mockolo -s Tests/ -d ./ProtocolMocks.swift
+./bin/mockolo -s Tests/ -d ./Tests/ProtocolMocks.swift
