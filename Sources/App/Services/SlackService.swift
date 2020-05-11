@@ -9,7 +9,7 @@ import Vapor
 
 /// @mockable
 protocol SlackWebServicing {
-    func sendSlackPayload(on req: Request) throws -> EventLoopFuture<HTTPStatus>
+    func sendSlackPayload(on req: Request) throws -> EventLoopFuture<Response>
     var req: Request? { get set }
 }
 
@@ -21,12 +21,12 @@ final class SlackWebService: SlackWebServicing {
         self.slackURL = slackURL
     }
 
-    func sendSlackPayload(on req: Request) throws -> EventLoopFuture<HTTPStatus> {
+    func sendSlackPayload(on req: Request) throws -> EventLoopFuture<Response> {
         return try SlackWebhookRequestPayload(text: "New invoice created").encode(for: req).flatMap { slackRequestPayload in
             return try req.client()
                 .post(self.slackURL) { slackMessagePost in
                     slackMessagePost.http.body = slackRequestPayload.http.body
-            }.transform(to: HTTPStatus.ok)
+            }
         }
     }
 }

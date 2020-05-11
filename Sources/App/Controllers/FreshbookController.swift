@@ -19,6 +19,7 @@ extension URL {
 enum FreshbooksError: Error {
     case invalidURL
     case noAccessTokenFound
+    case noVerifierAttribute
 }
 
 
@@ -120,9 +121,6 @@ extension EventLoopFuture where T == TokenExchangeResponse {
                         userRequest.http.headers.add(name: .authorization, value: "Bearer \(tokenExchangeResponse.accessToken)")
                     }.flatMap { userFetchResponse in
                         let userFetchResponseObject = try userFetchResponse.content.decode(UserFetchResponsePayload.self)
-                        userFetchResponseObject.do { payload in
-                            print("payload \(payload)")
-                        }
                         return userFetchResponseObject
                     }
             }

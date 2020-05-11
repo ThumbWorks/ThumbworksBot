@@ -24,19 +24,25 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
 
     func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<HTTPStatus> {
         let client = try req.client()
-        return try req.content.decode(FreshbooksReadyPayload.self).flatMap { payload in
+        return try req.content.decode(FreshbooksWebhookTriggeredContent.self).flatMap { payload in
 
             guard let url = URL(string: "https://api.freshbooks.com/events/account/\(payload.accountID)/events/callbacks/\(payload.objectID)") else {
                 throw FreshbooksError.invalidURL
             }
-            return try FreshbookConfirmReadyPayload(callback: FreshbooksCallback(callbackID: payload.objectID, verifier: payload.verifier)).encode(for: req).flatMap { confirmedReadyPayload -> EventLoopFuture<HTTPStatus> in
-                return client.put(url) { webhookRequest in
-                    webhookRequest.http.body = confirmedReadyPayload.http.body
-                    webhookRequest.http.contentType = .json
-                    webhookRequest.http.headers.add(name: .accept, value: "application/json")
-                    webhookRequest.http.headers.add(name: "Api-Version", value: "alpha")
-                    webhookRequest.http.headers.add(name: .authorization, value: "Bearer \(accessToken)")
-                }.transform(to: HTTPStatus.ok   )
+            guard let verifier = payload.verifier else {
+                throw FreshbooksError.noVerifierAttribute
+            }
+            let callback = FreshbooksCallback(callbackID: payload.objectID, verifier: verifier)
+            return try FreshbookConfirmReadyPayload(callback: callback)
+                .encode(for: req)
+                .flatMap { confirmedReadyPayload -> EventLoopFuture<HTTPStatus> in
+                    return client.put(url) { webhookRequest in
+                        webhookRequest.http.body = confirmedReadyPayload.http.body
+                        webhookRequest.http.contentType = .json
+                        webhookRequest.http.headers.add(name: .accept, value: "application/json")
+                        webhookRequest.http.headers.add(name: "Api-Version", value: "alpha")
+                        webhookRequest.http.headers.add(name: .authorization, value: "Bearer \(accessToken)")
+                    }.transform(to: HTTPStatus.ok   )
             }
         }
     }
@@ -80,37 +86,22 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
       }
 
     func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult> {
-           let url = "https://api.freshbooks.com/events/account/\(accountID)/events/callbacks"
-           return try req.client().get(url, headers: [HTTPHeaderName.accept.description: "application/json"]) { webhookRequest in
-
-                      webhookRequest.http.contentType = .json
-                      webhookRequest.http.headers.add(name: .accept, value: "application/json")
-                      webhookRequest.http.headers.add(name: "Api-Version", value: "alpha")
-                      webhookRequest.http.headers.add(name: .authorization, value: "Bearer \(accessToken)")
-                  }.flatMap({ response in
-                      response.http.contentType = .json
-                      return try response.content.decode(FreshbooksWebhookResponsePayload.self)
-                          .flatMap({ payload in
-                              req.future().map { payload.response.result }
-                          })
-                  })
-       }
-}
-
-
-//user_id=214214&name=callback.verify&verifier=xYfXk5imkxAmS3k8JnDnz4sGD4Pk62WASm&object_id=778573&account_id=xazq5&system=https%3A%2F%2Fthumbworks.freshbooks.com)
-struct FreshbooksReadyPayload: Codable {
-    let name: String
-    let verifier: String
-    let objectID: Int
-    let accountID: String
-    let system: String
-    enum CodingKeys: String, CodingKey {
-        case name, verifier, system
-        case accountID = "account_id"
-        case objectID = "object_id"
+        let url = "https://api.freshbooks.com/events/account/\(accountID)/events/callbacks"
+        return try req.client().get(url) { webhookRequest in
+            webhookRequest.http.contentType = .json
+            webhookRequest.http.headers.add(name: .accept, value: "application/json")
+            webhookRequest.http.headers.add(name: "Api-Version", value: "alpha")
+            webhookRequest.http.headers.add(name: .authorization, value: "Bearer \(accessToken)")
+        }.flatMap({ response in
+            response.http.contentType = .json
+            return try response.content.decode(FreshbooksWebhookResponsePayload.self)
+                .flatMap({ payload in
+                    req.future().map { payload.response.result }
+                })
+        })
     }
 }
+
 
 struct FreshbookConfirmReadyPayload: Content {
     let callback: FreshbooksCallback
@@ -127,16 +118,18 @@ struct FreshbooksCallback: Content {
 
 //user_id=214214&name=callback.verify&verifier=xf8pxDkZfSXuak7S4qaGQBvxArpMvqR&object_id=778599&account_id=xazq5&system=https%3A%2F%2Fthumbworks.freshbooks.com)
 
-struct WebhookTriggered: Content {
+struct FreshbooksWebhookTriggeredContent: Content {
     let userID: Int
     let name: String
-    let objectID: String
+    let objectID: Int
+    let verified: Bool?
+    let verifier: String?
     let accountID: String
     enum CodingKeys: String, CodingKey {
         case userID = "user_id"
         case objectID = "object_id"
         case accountID = "account_id"
-        case name
+        case verifier, verified, name
     }
 }
 
@@ -169,9 +162,5 @@ public struct FreshbooksWebhookCallbackResponse: Codable, Content {
     let verified: Bool
     let uri: String
     let event: String
-}
-
-private struct FreshbooksGetWebhookRequestPayload: Content {
-    let name: String
 }
 

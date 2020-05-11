@@ -10,6 +10,7 @@ import Authentication
 
 
 enum UserError: Error {
+    case noUserWithThatAccessToken
     case noAccessToken
     case noAccountID
 }
@@ -58,13 +59,15 @@ final public  class WebhookController {
     //
     // The webhook payload looks like this:
     // http://your_server.com/webhooks/ready?name=invoice.create&object_id=1234567&account_id=6BApk&user_id=1
-    func ready(_ req: Request) throws ->  EventLoopFuture<HTTPStatus> {
-        do {
-            return try executeWebhook(on: req)
-        } catch {
-            print("Not in the content params. probably just verifying")
+    public func ready(_ req: Request) throws ->  EventLoopFuture<HTTPStatus> {
+        return try req.content.decode(FreshbooksWebhookTriggeredContent.self)
+            .flatMap { triggeredPayload in
+                if let _  = triggeredPayload.verifier {
+                    return try self.verifyWebhook(on: req).transform(to: .ok)
+                } else {
+                    return try self.executeWebhook(on: req).transform(to: .ok)
+                }
         }
-        return try verifyWebhook(on: req)
     }
 
     func deleteWebhook(_ req: Request) throws -> EventLoopFuture<Response> {
@@ -112,8 +115,8 @@ final public  class WebhookController {
 }
 
 extension WebhookController {
-    private func executeWebhook(on req: Request) throws ->  EventLoopFuture<HTTPStatus> {
-        return try req.content.decode(WebhookTriggered.self)
+    private func executeWebhook(on req: Request) throws ->  EventLoopFuture<Response> {
+        return try req.content.decode(FreshbooksWebhookTriggeredContent.self)
             .flatMap { triggeredPayload in
                 // let objectID = triggeredPayload.objectID // TODO query freshbooks for what this is
                 try self.slackService.sendSlackPayload(on: req)
@@ -124,7 +127,7 @@ extension WebhookController {
         return User.query(on: req).all().flatMap { (users) in
             // NOTE: At this point, freshbooks is doing an unauthenticated call. We don't generally have an access token so we hack it so that the user object has one, we fetch that and send it
             guard let accessToken = users.first?.accessToken else {
-                throw UserError.noAccessToken
+                throw UserError.noUserWithThatAccessToken
             }
             return try self.freshbooksService.confirmWebhook(accessToken: accessToken, on: req)
         }
