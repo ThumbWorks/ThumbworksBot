@@ -13,8 +13,11 @@ enum TestingError: Error {
     case slackFail
 }
 class WebhookControllerTests: XCTestCase {
+    let thisApp = try! app(Environment(name: "test", isRelease: false))
 
-
+    let business = BusinessPayload(id: 345, name: "Thumbworks", accountID: "accountID123")
+    lazy var membership = MembershipPayload(id: 123, role: "manager", business: business)
+    lazy var response = UserResponseObject(id: 123, firstName: "rod", lastName: "campbell", businessMemberships: [membership])
     let freshbooksVerifiedWebhookContent = FreshbooksWebhookTriggeredContent(userID: 1,
                                                                              name: "create an invoice",
                                                                              objectID: 123,
@@ -58,13 +61,17 @@ class WebhookControllerTests: XCTestCase {
         }
         return promise.futureResult
     }
-    override func setUp() { }
+    override func setUp() {
+        let req = Request(using: thisApp)
+
+        let testUser = try? User(responseObject: response, accessToken: "accessToken").save(on: req).wait()
+        let _ = try? Webhook(webhookID: 123, userID: try testUser!.requireID()).save(on: req).wait()
+    }
     override func tearDown() { }
     func testSlackMessageGetsSentOnVerifiedWebhook() throws {
+        let req = Request(using: thisApp)
         // Set up the success case
         slack.sendSlackPayloadHandler =  successSlackRequestHandler
-        let thisApp = try app(Environment(name: "test", isRelease: false))
-        let req = Request(using: thisApp)
         do {
             try req.content.encode(freshbooksVerifiedWebhookContent)
         } catch {
@@ -76,16 +83,7 @@ class WebhookControllerTests: XCTestCase {
     }
 
     func testFreshbooksVerificationWebhook() throws {
-        // Set up the success case
-        let thisApp = try app(Environment(name: "test", isRelease: false))
         let req = Request(using: thisApp)
-        let business = BusinessPayload(id: 345, name: "Thumbworks", accountID: "accountID123")
-        let membership = MembershipPayload(id: 123, role: "manager", business: business)
-        let response = UserResponseObject(id: 123, firstName: "rod", lastName: "campbell", businessMemberships: [membership])
-
-        let testUser = try User(responseObject: response, accessToken: "accessToken").save(on: req).wait()
-        let _ = try Webhook(webhookID: 123, userID: try testUser.requireID()).save(on: req).wait()
-
         freshbooks.confirmWebhookHandler = confirmWebhookRequestHandler
         do {
             try req.content.encode(freshbooksVerifyContent)
