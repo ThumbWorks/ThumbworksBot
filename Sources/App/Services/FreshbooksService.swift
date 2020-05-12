@@ -10,7 +10,7 @@ import Vapor
 /// @mockable
 protocol FreshbooksWebServicing {
     func deleteWebhook(accountID: String, on req: Request) throws -> EventLoopFuture<Response>
-    func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<Response>
+    func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<HTTPStatus>
     func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult>
     func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<HTTPStatus>
 }
@@ -42,7 +42,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
                         webhookRequest.http.headers.add(name: .accept, value: "application/json")
                         webhookRequest.http.headers.add(name: "Api-Version", value: "alpha")
                         webhookRequest.http.headers.add(name: .authorization, value: "Bearer \(accessToken)")
-                    }.transform(to: HTTPStatus.ok   )
+                    }.transform(to: HTTPStatus.ok)
             }
         }
     }
@@ -65,25 +65,38 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         }
     }
 
-    func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<Response> {
-          let callback = NewWebhookCallback(event: "invoice.create", uri: "\(hostname)/webhooks/ready")
+    func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<HTTPStatus> {
+          let callback = NewWebhookCallbackRequest(event: "invoice.create", uri: "\(hostname)/webhooks/ready")
+
           let requestPayload = CreateWebhookRequestPayload(callback: callback)
           guard let url = URL(string: "https://api.freshbooks.com/events/account/\(accountID)/events/callbacks") else {
               throw FreshbooksError.invalidURL
           }
 
-          return try requestPayload.encode(using: req).flatMap { request -> EventLoopFuture<Response> in
-              let body = request.http.body
-              let client = try req.client()
-              return client.post(url, headers: [HTTPHeaderName.accept.description: "application/json"]) { webhookRequest in
-                  webhookRequest.http.body = body
-                  webhookRequest.http.contentType = .json
-                  webhookRequest.http.headers.add(name: .accept, value: "application/json")
-                  webhookRequest.http.headers.add(name: "Api-Version", value: "alpha")
-                  webhookRequest.http.headers.add(name: .authorization, value: "Bearer \(accessToken)")
-              }
-          }
-      }
+        return try requestPayload.encode(using: req).flatMap { request in
+            let body = request.http.body
+            let client = try req.client()
+            return client.post(url) { webhookRequest in
+                webhookRequest.http.body = body
+                webhookRequest.http.contentType = .json
+                webhookRequest.http.headers.add(name: .authorization, value: "Bearer \(accessToken)")
+            }.flatMap({ (response)  in
+                // for whatever reason, couldn't parse the content properly, reverting to the old way
+                guard let data = response.http.body.data,
+                    let json = try? JSONSerialization.jsonObject(with: data, options: []),
+                    let dict = json as? [String: Any],
+                    let response = dict["response"] as? [String: Any],
+                    let result = response["result"] as? [String: Any],
+                    let callback = result["callback"] as? [String: Any],
+                    let webhookID = callback["callbackid"] as? Int else {
+                        throw WebhookError.unableToParseWebhook
+                }
+                let user = try req.requireAuthenticated(User.self)
+                let newWebhook = Webhook(webhookID: webhookID, userID: try user.requireID())
+                return newWebhook.save(on: req).transform(to: .ok)
+            })
+        }
+    }
 
     func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult> {
         let url = "https://api.freshbooks.com/events/account/\(accountID)/events/callbacks"
@@ -111,8 +124,8 @@ struct FreshbooksCallback: Content {
     let callbackID: Int
     let verifier: String
     enum CodingKeys: String, CodingKey {
-            case verifier
-            case callbackID = "callback_id"
+        case verifier
+        case callbackID = "callbackid"
     }
 }
 

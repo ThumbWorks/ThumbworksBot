@@ -82,7 +82,9 @@ class WebhookControllerTests: XCTestCase {
         let business = BusinessPayload(id: 345, name: "Thumbworks", accountID: "accountID123")
         let membership = MembershipPayload(id: 123, role: "manager", business: business)
         let response = UserResponseObject(id: 123, firstName: "rod", lastName: "campbell", businessMemberships: [membership])
-        _ = try User(responseObject: response, accessToken: "accessToken").save(on: req).wait()
+
+        let testUser = try User(responseObject: response, accessToken: "accessToken").save(on: req).wait()
+        let _ = try Webhook(webhookID: 123, userID: try testUser.requireID()).save(on: req).wait()
 
         freshbooks.confirmWebhookHandler = confirmWebhookRequestHandler
         do {
@@ -94,9 +96,12 @@ class WebhookControllerTests: XCTestCase {
         } catch UserError.noUserWithThatAccessToken {
             XCTFail("Failed to fetch user with given access token from database")
         }
+        catch WebhookError.webhookNotFound {
+            XCTFail("webhookNotFound. Possibly forgot to create a webhook in the database during the test")
+        }
         catch {
-            XCTFail()
             print(error)
+            XCTFail(error.localizedDescription)
         }
     }
 }

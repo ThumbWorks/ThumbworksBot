@@ -13,6 +13,13 @@ enum UserError: Error {
     case noUserWithThatAccessToken
     case noAccessToken
     case noAccountID
+
+}
+
+enum WebhookError: Error {
+    case webhookNotFound
+    case orphanedWebhook
+    case unableToParseWebhook
 }
 
 
@@ -63,10 +70,9 @@ final public  class WebhookController {
         return try req.content.decode(FreshbooksWebhookTriggeredContent.self)
             .flatMap { triggeredPayload in
                 if let _  = triggeredPayload.verifier {
-                    return try self.verifyWebhook(on: req).transform(to: .ok)
-                } else {
-                    return try self.executeWebhook(on: req).transform(to: .ok)
+                    return try self.verifyWebhook(webhookID: triggeredPayload.objectID, on: req).transform(to: .ok)
                 }
+                return try self.executeWebhook(on: req).transform(to: .ok)
         }
     }
 
@@ -79,7 +85,7 @@ final public  class WebhookController {
     }
 
 
-    func registerNewWebhook(_ req: Request) throws -> EventLoopFuture<Response> {
+    func registerNewWebhook(_ req: Request) throws -> EventLoopFuture<HTTPStatus> {
         let user = try req.requireAuthenticated(User.self)
 
         guard let accountID = user.accountID() else {
@@ -123,13 +129,20 @@ extension WebhookController {
         }
     }
 
-    private func verifyWebhook(on req: Request) throws ->  EventLoopFuture<HTTPStatus> {
-        return User.query(on: req).all().flatMap { (users) in
-            // NOTE: At this point, freshbooks is doing an unauthenticated call. We don't generally have an access token so we hack it so that the user object has one, we fetch that and send it
-            guard let accessToken = users.first?.accessToken else {
-                throw UserError.noUserWithThatAccessToken
+    private func verifyWebhook(webhookID: Int, on req: Request) throws ->  EventLoopFuture<HTTPStatus> {
+
+
+        return Webhook.query(on: req).filter(\.webhookID == webhookID).first().flatMap { webhook in
+            guard let webhook = webhook else {
+                throw WebhookError.webhookNotFound
             }
-            return try self.freshbooksService.confirmWebhook(accessToken: accessToken, on: req)
+            return User.find(webhook.userID, on: req).flatMap { user in
+                guard let user = user else {
+                    throw WebhookError.orphanedWebhook
+                }
+                return try self.freshbooksService.confirmWebhook(accessToken: user.accessToken, on: req)
+                    .transform(to: .ok)
+            }
         }
     }
 }

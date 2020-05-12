@@ -178,23 +178,13 @@ struct AuthRequest: Content {
     let code: String
 }
 
-struct NewWebookResponseCallback: Content {
-    let event: String
-    let uri: String
-    let callbackID: Int
-    let id: Int
-    let verified: Bool
-}
-struct NewWebhookCallback: Content {
+struct NewWebhookCallbackRequest: Content {
     let event: String
     let uri: String
 }
+
 struct CreateWebhookRequestPayload: Content {
-    var callback: NewWebhookCallback
-}
-struct IncomingWebhookPayload: Content {
-    var githubTeam: String
-    var swaggerSpecURL: String
+    var callback: NewWebhookCallbackRequest
 }
 
 struct UserResponseObject: Content {
