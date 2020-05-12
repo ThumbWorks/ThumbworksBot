@@ -12,10 +12,101 @@ protocol FreshbooksWebServicing {
     func deleteWebhook(accountID: String, on req: Request) throws -> EventLoopFuture<Response>
     func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<HTTPStatus>
     func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult>
+    func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoice>
+    func allInvoices(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]>
     func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<HTTPStatus>
 }
 
+struct InvoicePackage: Content {
+    let response: InvoiceResponse
+    struct InvoiceResponse: Content {
+        let result: InvoiceContainer
+        struct InvoiceContainer: Content {
+            let invoice: FreshbooksInvoice
+        }
+    }
+
+}
+struct InvoicesPackage: Content {
+    let response: InvoicesResult
+
+    struct InvoicesResult: Content {
+        let result: Invoices
+        struct Invoices: Content {
+            let invoices: [FreshbooksInvoice]
+        }
+    }
+}
+
+struct Amount: Content, Equatable {
+    let amount: String
+    let code: String
+}
+
+struct FreshbooksInvoice: Content, Equatable {
+    let id: Int
+    let status: Int
+    let paymentStatus: String
+    let currentOrganization: String
+    let amount: Amount
+
+    enum CodingKeys: String, CodingKey {
+        case status, id, amount
+//        case createDate = "create_date"
+        case paymentStatus = "payment_status"
+        case currentOrganization = "current_organization"
+    }
+}
+
+class HeaderProvider {
+    let accessToken: String
+    let response: Response?
+    init(accessToken: String, bodyContent: Response? = nil) {
+        self.accessToken = accessToken
+        self.response = bodyContent
+    }
+    func setHeaders(request: Request) throws -> () {
+        if let response = response?.http.body {
+            request.http.body = response
+        }
+        request.http.contentType = .json
+        request.http.headers.add(name: .accept, value: "application/json")
+        request.http.headers.add(name: "Api-Version", value: "alpha")
+        request.http.headers.add(name: .authorization, value: "Bearer \(accessToken)")
+    }
+}
 final class FreshbooksWebservice: FreshbooksWebServicing {
+
+    func allInvoices(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]> {
+        guard let url = URL(string: "https://api.freshbooks.com/accounting/account/\(accountID)/invoices/invoices") else {
+            throw FreshbooksError.invalidURL
+        }
+
+        let provider = HeaderProvider(accessToken: accessToken)
+        let client = try req.client()
+        return client.get(url, beforeSend: provider.setHeaders).flatMap { response in
+            do {
+                return try response.content.decode(InvoicesPackage.self).map {  $0.response.result.invoices }
+            }
+            catch {
+                print(error)
+                throw InvoiceError.notParsed
+            }
+        }
+    }
+    func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoice> {
+        guard let url = URL(string: "https://api.freshbooks.com/accounting/account/\(accountID)/invoices/invoices/\(invoiceID)") else {
+            throw FreshbooksError.invalidURL
+        }
+        let client = try req.client()
+        let provider = HeaderProvider(accessToken: accessToken)
+        return client.get(url, beforeSend: provider.setHeaders).flatMap { response in
+            try response.content.decode(InvoicePackage.self).map({ package  in
+                return package.response.result.invoice
+            })
+        }
+    }
+
     let hostname: String
 
     init(hostname: String) {
@@ -36,13 +127,9 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
             return try FreshbookConfirmReadyPayload(callback: callback)
                 .encode(for: req)
                 .flatMap { confirmedReadyPayload -> EventLoopFuture<HTTPStatus> in
-                    return client.put(url) { webhookRequest in
-                        webhookRequest.http.body = confirmedReadyPayload.http.body
-                        webhookRequest.http.contentType = .json
-                        webhookRequest.http.headers.add(name: .accept, value: "application/json")
-                        webhookRequest.http.headers.add(name: "Api-Version", value: "alpha")
-                        webhookRequest.http.headers.add(name: .authorization, value: "Bearer \(accessToken)")
-                    }.transform(to: HTTPStatus.ok)
+                    let provider = HeaderProvider(accessToken: accessToken, bodyContent: confirmedReadyPayload)
+                   return client.put(url, beforeSend: provider.setHeaders)
+                    .transform(to: HTTPStatus.ok)
             }
         }
     }

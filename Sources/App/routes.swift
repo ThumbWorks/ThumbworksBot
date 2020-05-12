@@ -42,5 +42,6 @@ public func routes(_ router: Router) throws {
     authenticatedUserGroup.get("/allWebhooks", use: webhookController.allWebhooks)
     authenticatedUserGroup.post("/webhooks/new", use: webhookController.registerNewWebhook)
     authenticatedUserGroup.get("/webhooks/delete", use: webhookController.deleteWebhook)
+    authenticatedUserGroup.get("/invoices/", use: webhookController.getInvoices)
 }
 

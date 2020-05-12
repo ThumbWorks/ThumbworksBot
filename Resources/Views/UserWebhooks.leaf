@@ -7,7 +7,7 @@
         function createWebhook() {
             fetch('/webhooks/new', { method: 'POST'})
             .then((response) => {
-                location.reload();
+                loadWebhooks();
             })
         }
         function loadWebhooks() {
@@ -40,6 +40,37 @@
                 }
             });
         }
+
+        function loadInvoices() {
+
+                   fetch('/invoices', {
+                   headers: {
+                    'Content-Type': 'application/json'
+                   }
+                   })
+                   .then((response) => {
+                     return response.json();
+                   })
+                   .then((result) => {
+                       var webhooks = result["callbacks"]
+                       console.log(webhooks)
+                       for (i = 0; i < webhooks.length; i++) {
+                           var webhook = webhooks[i]
+                           var table = document.getElementById("webhookTable");
+
+                           var row = document.createElement("TR");
+                           // a name for looking up the thing we will delete from the table later
+                           row.id = "webhook-"+webhook.id
+
+                           table.appendChild(row);
+                           row.insertCell(0).innerHTML = webhook.callbackid
+                           row.insertCell(1).innerHTML = webhook.verified
+                           row.insertCell(2).innerHTML = webhook.uri
+                           row.insertCell(3).innerHTML = webhook.event
+                           row.insertCell(4).innerHTML = "<a href=/webhooks/delete?id=" + webhook.callbackid + ">delete</a>"
+                       }
+                   });
+               }
         
     </script>
     <head>
@@ -67,6 +98,7 @@
 
     <button type="button" onclick="createWebhook()" class="btn btn-outline-primary">Create Webhook</button>
     <button type="button" onclick="loadWebhooks()" class="btn btn-outline-primary">Load Webhook</button>
+    <button type="button" onclick="loadInvoices()" class="btn btn-outline-primary">Load Invoices</button>
 
 </body>
 </html>

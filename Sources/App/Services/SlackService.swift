@@ -7,9 +7,27 @@
 
 import Vapor
 
+enum Emoji: String {
+    case uber = "Uber Technologies, Inc"
+    case lohi = "Lohi Labs"
+    case apple
+
+    var symbol: String {
+        get {
+            switch self {
+            case .uber:
+                return ":uber:"
+            case .lohi:
+                return ":walmart:"
+            case .apple:
+                return ":apple:"
+            }
+        }
+    }
+}
 /// @mockable
 protocol SlackWebServicing {
-    func sendSlackPayload(on req: Request) throws -> EventLoopFuture<Response>
+    func sendSlackPayload(text: String, with emoji: Emoji?, on req: Request) throws -> EventLoopFuture<Response>
     var req: Request? { get set }
 }
 
@@ -21,8 +39,8 @@ final class SlackWebService: SlackWebServicing {
         self.slackURL = slackURL
     }
 
-    func sendSlackPayload(on req: Request) throws -> EventLoopFuture<Response> {
-        return try SlackWebhookRequestPayload(text: "New invoice created").encode(for: req).flatMap { slackRequestPayload in
+    func sendSlackPayload(text: String, with emoji: Emoji?, on req: Request) throws -> EventLoopFuture<Response> {
+        return try SlackWebhookRequestPayload(text: text, iconEmoji: emoji?.symbol).encode(for: req).flatMap { slackRequestPayload in
             try req.client()
                 .post(self.slackURL) { slackMessagePost in
                     slackMessagePost.http.body = slackRequestPayload.http.body

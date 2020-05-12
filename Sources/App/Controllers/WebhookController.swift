@@ -15,6 +15,9 @@ enum UserError: Error {
     case noAccountID
 
 }
+enum InvoiceError: Error {
+    case notParsed
+}
 
 enum WebhookError: Error {
     case webhookNotFound
@@ -84,6 +87,20 @@ final public  class WebhookController {
         return try freshbooksService.deleteWebhook(accountID: accountID, on: req)
     }
 
+    func getInvoices(_ req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]> {
+        let user = try req.requireAuthenticated(User.self)
+        guard let accountID = user.accountID() else {
+            throw UserError.noAccountID
+        }
+        guard let accessToken = try req.session()["accessToken"] else {
+            throw UserError.noAccessToken
+        }
+        return try freshbooksService.allInvoices(accountID: accountID, accessToken: accessToken, req: req)
+    }
+
+    func getInvoice(accountID: String, invoiceID: Int, accessToken: String, on req: Request) throws -> EventLoopFuture<FreshbooksInvoice> {
+        return try freshbooksService.fetchInvoice(accountID: accountID, invoiceID: invoiceID, accessToken: accessToken, req: req)
+    }
 
     func registerNewWebhook(_ req: Request) throws -> EventLoopFuture<HTTPStatus> {
         let user = try req.requireAuthenticated(User.self)
@@ -124,14 +141,29 @@ extension WebhookController {
     private func executeWebhook(on req: Request) throws ->  EventLoopFuture<Response> {
         return try req.content.decode(FreshbooksWebhookTriggeredContent.self)
             .flatMap { triggeredPayload in
-                // let objectID = triggeredPayload.objectID // TODO query freshbooks for what this is
-                try self.slackService.sendSlackPayload(on: req)
+                return User.find(triggeredPayload.userID, on: req).flatMap { user in
+                    guard let user = user else {
+                        throw WebhookError.orphanedWebhook
+                    }
+
+                    guard let accountID = user.accountID() else {
+                        throw UserError.noAccountID
+                    }
+                    let objectID = triggeredPayload.objectID
+                    return try self.getInvoice(accountID: accountID,
+                                               invoiceID: objectID,
+                                               accessToken: user.accessToken,
+                                               on: req)
+                        .flatMap({ invoice in
+                            let text = "New invoice created to \(invoice.currentOrganization), for \(invoice.amount.amount) \(invoice.amount.code)"
+                            let emoji = Emoji(rawValue: invoice.currentOrganization)
+                            return try self.slackService.sendSlackPayload(text: text, with:emoji, on: req)
+                        })
+                }
         }
     }
 
     private func verifyWebhook(webhookID: Int, on req: Request) throws ->  EventLoopFuture<HTTPStatus> {
-
-
         return Webhook.query(on: req).filter(\.webhookID == webhookID).first().flatMap { webhook in
             guard let webhook = webhook else {
                 throw WebhookError.webhookNotFound
