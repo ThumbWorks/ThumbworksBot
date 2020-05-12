@@ -10,6 +10,19 @@ public func configure(_ config: inout Config, _ env: inout Environment, _ servic
     try services.register(LeafProvider())
     config.prefer(LeafRenderer.self, for: ViewRenderer.self)
 
+    /// Create default content config
+    var contentConfig = ContentConfig.default()
+
+    /// Create custom JSON encoder
+    let jsonDecoder = JSONDecoder()
+    let formatter = DateFormatter()
+    formatter.dateFormat = "YYYY-MM-DD HH:mm:ss"
+    jsonDecoder.dateDecodingStrategy = .formatted(formatter)
+
+    /// Register JSON encoder and content config
+    contentConfig.use(decoder: jsonDecoder, for: .json)
+    services.register(contentConfig)
+
     // Register routes to the router
     let router = EngineRouter.default()
     try routes(router)

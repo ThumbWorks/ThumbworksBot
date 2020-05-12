@@ -49,10 +49,10 @@ struct FreshbooksInvoice: Content, Equatable {
     let paymentStatus: String
     let currentOrganization: String
     let amount: Amount
-
+    let createdAt: Date
     enum CodingKeys: String, CodingKey {
         case status, id, amount
-//        case createDate = "create_date"
+        case createdAt = "created_at"
         case paymentStatus = "payment_status"
         case currentOrganization = "current_organization"
     }

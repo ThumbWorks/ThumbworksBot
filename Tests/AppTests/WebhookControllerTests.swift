@@ -18,7 +18,8 @@ class WebhookControllerTests: XCTestCase {
                                            status: 2,
                                            paymentStatus: "unpaid",
                                            currentOrganization: Emoji.uber.rawValue,
-                                           amount: Amount(amount: "123", code: "USD"))
+                                           amount: Amount(amount: "123", code: "USD"),
+                                           createdAt: Date())
     let business = BusinessPayload(id: 345, name: "Thumbworks", accountID: "accountID123")
     lazy var membership = MembershipPayload(id: 123, role: "manager", business: business)
     lazy var response = UserResponseObject(id: 123, firstName: "rod", lastName: "campbell", businessMemberships: [membership])
