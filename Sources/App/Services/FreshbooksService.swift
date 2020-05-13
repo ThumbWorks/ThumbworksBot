@@ -38,7 +38,7 @@ protocol FreshbooksWebServicing {
     func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoice>
     func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserFetchResponsePayload>
     func allInvoices(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]>
-    func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<HTTPStatus>
+    func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<Response>
     func auth(with code: String, on req: Request) throws -> EventLoopFuture<TokenExchangeResponse>
 }
 
@@ -100,7 +100,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         }
     }
 
-    func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<HTTPStatus> {
+    func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<Response> {
         let client = try req.client()
         return try req.content.decode(FreshbooksWebhookTriggeredContent.self).flatMap { payload in
             guard let url = URL.freshbooksCallbackURL(accountID: payload.accountID, objectID: payload.objectID) else {
@@ -112,10 +112,9 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
             let callback = FreshbooksCallback(callbackID: payload.objectID, verifier: verifier)
             return try FreshbookConfirmReadyPayload(callback: callback)
                 .encode(for: req)
-                .flatMap { confirmedReadyPayload -> EventLoopFuture<HTTPStatus> in
+                .flatMap { confirmedReadyPayload in
                     let provider = FreshbooksHeaderProvider(accessToken: accessToken, bodyContent: confirmedReadyPayload)
                    return client.put(url, beforeSend: provider.setHeaders)
-                    .transform(to: HTTPStatus.ok)
             }
         }
     }
