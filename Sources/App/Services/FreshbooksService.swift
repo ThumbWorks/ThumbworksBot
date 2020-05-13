@@ -100,9 +100,6 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         }
     }
 
-
-
-
     func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<HTTPStatus> {
         let client = try req.client()
         return try req.content.decode(FreshbooksWebhookTriggeredContent.self).flatMap { payload in
@@ -137,13 +134,11 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
     }
 
     func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<HTTPStatus> {
-          let callback = NewWebhookCallbackRequest(event: "invoice.create", uri: "\(hostname)/webhooks/ready")
-
-          let requestPayload = CreateWebhookRequestPayload(callback: callback)
-
-          guard let url = URL.freshbooksCallbacksURL(accountID: accountID) else {
-              throw FreshbooksError.invalidURL
-          }
+        let callback = NewWebhookCallbackRequest(event: "invoice.create", uri: "\(hostname)/webhooks/ready")
+        let requestPayload = CreateWebhookRequestPayload(callback: callback)
+        guard let url = URL.freshbooksCallbacksURL(accountID: accountID) else {
+            throw FreshbooksError.invalidURL
+        }
 
         return try requestPayload.encode(using: req).flatMap { request in
             let body = request.http.body
@@ -199,9 +194,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
                 return try req.client().post(URL.freshbooksAuth) { request in
                     request.http.contentType = .json
                     request.http.body = tokenRequest.http.body
-                }.flatMap { tokenExchangeResponse -> EventLoopFuture<TokenExchangeResponse> in
-                    return try tokenExchangeResponse.content.decode(TokenExchangeResponse.self)
-                }
+                }.flatMap { try $0.content.decode(TokenExchangeResponse.self)}
         }
     }
 
@@ -210,10 +203,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
             .flatMap { userFetchResponse -> EventLoopFuture<UserFetchResponsePayload> in
                 let provider = FreshbooksHeaderProvider(accessToken: accessToken)
                 return try req.client().get(URL.freshbooksUser, beforeSend: provider.setHeaders)
-                    .flatMap { userFetchResponse in
-                        let userFetchResponseObject = try userFetchResponse.content.decode(UserFetchResponsePayload.self)
-                        return userFetchResponseObject
-                }
+                    .flatMap { try $0.content.decode(UserFetchResponsePayload.self) }
         }
     }
 }
