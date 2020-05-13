@@ -21,11 +21,10 @@ public func routes(_ router: Router) throws {
     }
 
     let slack = SlackWebService(slackURL: slackMessageURL)
-    let freshbookService = FreshbooksWebservice(hostname: hostname)
-    let freshbooksController = FreshbooksController(clientID: clientID,
-                                                    clientSecret: clientSecret,
-                                                    callbackHost: hostname,
-                                                    freshbooksService: freshbookService)
+    let freshbookService = FreshbooksWebservice(hostname: hostname,
+                                                clientID: clientID,
+                                                clientSecret: clientSecret)
+    let freshbooksController = FreshbooksController(freshbooksService: freshbookService)
     let webhookController = WebhookController(hostName: hostname,
                                               slackService: slack,
                                               freshbooksService: freshbookService)
