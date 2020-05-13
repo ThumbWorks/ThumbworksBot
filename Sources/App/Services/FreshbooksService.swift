@@ -17,48 +17,7 @@ protocol FreshbooksWebServicing {
     func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<HTTPStatus>
 }
 
-struct InvoicePackage: Content {
-    let response: InvoiceResponse
-    struct InvoiceResponse: Content {
-        let result: InvoiceContainer
-        struct InvoiceContainer: Content {
-            let invoice: FreshbooksInvoice
-        }
-    }
-
-}
-struct InvoicesPackage: Content {
-    let response: InvoicesResult
-
-    struct InvoicesResult: Content {
-        let result: Invoices
-        struct Invoices: Content {
-            let invoices: [FreshbooksInvoice]
-        }
-    }
-}
-
-struct Amount: Content, Equatable {
-    let amount: String
-    let code: String
-}
-
-struct FreshbooksInvoice: Content, Equatable {
-    let id: Int
-    let status: Int
-    let paymentStatus: String
-    let currentOrganization: String
-    let amount: Amount
-    let createdAt: Date
-    enum CodingKeys: String, CodingKey {
-        case status, id, amount
-        case createdAt = "created_at"
-        case paymentStatus = "payment_status"
-        case currentOrganization = "current_organization"
-    }
-}
-
-class HeaderProvider {
+class FreshbooksHeaderProvider {
     let accessToken: String
     let response: Response?
     init(accessToken: String, bodyContent: Response? = nil) {
@@ -75,6 +34,7 @@ class HeaderProvider {
         request.http.headers.add(name: .authorization, value: "Bearer \(accessToken)")
     }
 }
+
 final class FreshbooksWebservice: FreshbooksWebServicing {
 
     func allInvoices(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]> {
@@ -82,7 +42,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
             throw FreshbooksError.invalidURL
         }
 
-        let provider = HeaderProvider(accessToken: accessToken)
+        let provider = FreshbooksHeaderProvider(accessToken: accessToken)
         let client = try req.client()
         return client.get(url, beforeSend: provider.setHeaders).flatMap { response in
             do {
@@ -99,7 +59,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
             throw FreshbooksError.invalidURL
         }
         let client = try req.client()
-        let provider = HeaderProvider(accessToken: accessToken)
+        let provider = FreshbooksHeaderProvider(accessToken: accessToken)
         return client.get(url, beforeSend: provider.setHeaders).flatMap { response in
             try response.content.decode(InvoicePackage.self).map({ package  in
                 return package.response.result.invoice
@@ -127,7 +87,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
             return try FreshbookConfirmReadyPayload(callback: callback)
                 .encode(for: req)
                 .flatMap { confirmedReadyPayload -> EventLoopFuture<HTTPStatus> in
-                    let provider = HeaderProvider(accessToken: accessToken, bodyContent: confirmedReadyPayload)
+                    let provider = FreshbooksHeaderProvider(accessToken: accessToken, bodyContent: confirmedReadyPayload)
                    return client.put(url, beforeSend: provider.setHeaders)
                     .transform(to: HTTPStatus.ok)
             }
@@ -176,7 +136,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
                     let result = response["result"] as? [String: Any],
                     let callback = result["callback"] as? [String: Any],
                     let webhookID = callback["callbackid"] as? Int else {
-                        throw WebhookError.unableToParseWebhook
+                        throw FreshbooksError.unableToParseWebhookObject
                 }
                 let user = try req.requireAuthenticated(User.self)
                 let newWebhook = Webhook(webhookID: webhookID, userID: try user.requireID())
@@ -201,7 +161,6 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         })
     }
 }
-
 
 struct FreshbookConfirmReadyPayload: Content {
     let callback: FreshbooksCallback
@@ -245,7 +204,7 @@ private struct DeleteWebhookRequestPayload: Codable {
     let id: Int
 }
 
-public struct FreshbooksWebhookResponseResult: Codable, Content {
+struct FreshbooksWebhookResponseResult: Codable, Content {
     let perPage: Int
     let pages: Int
     let page: Int
@@ -257,10 +216,59 @@ public struct FreshbooksWebhookResponseResult: Codable, Content {
     }
 }
 
-public struct FreshbooksWebhookCallbackResponse: Codable, Content {
+struct FreshbooksWebhookCallbackResponse: Codable, Content {
     let callbackid: Int
     let verified: Bool
     let uri: String
     let event: String
 }
 
+
+struct InvoicePackage: Content {
+    let response: InvoiceResponse
+    struct InvoiceResponse: Content {
+        let result: InvoiceContainer
+        struct InvoiceContainer: Content {
+            let invoice: FreshbooksInvoice
+        }
+    }
+
+}
+struct InvoicesPackage: Content {
+    let response: InvoicesResult
+
+    struct InvoicesResult: Content {
+        let result: Invoices
+        struct Invoices: Content {
+            let invoices: [FreshbooksInvoice]
+        }
+    }
+}
+
+struct FreshbooksInvoice: Content, Equatable {
+    let id: Int
+    let status: Int
+    let paymentStatus: String
+    let currentOrganization: String
+    let amount: Amount
+    let createdAt: Date
+
+    struct Amount: Content, Equatable {
+        let amount: String
+        let code: String
+    }
+    enum CodingKeys: String, CodingKey {
+        case status, id, amount
+        case createdAt = "created_at"
+        case paymentStatus = "payment_status"
+        case currentOrganization = "current_organization"
+    }
+}
+
+// Errors
+enum FreshbooksError: Error {
+    case invalidURL
+    case noAccessTokenFound
+    case noVerifierAttribute
+    case unableToParseWebhookObject
+}

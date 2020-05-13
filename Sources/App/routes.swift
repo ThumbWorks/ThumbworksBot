@@ -21,9 +21,14 @@ public func routes(_ router: Router) throws {
     }
 
     let slack = SlackWebService(slackURL: slackMessageURL)
-    let freshbooksController = FreshbooksController(clientID: clientID, clientSecret: clientSecret, callbackHost: hostname)
     let freshbookService = FreshbooksWebservice(hostname: hostname)
-    let webhookController = WebhookController(hostName: hostname, slackService: slack, freshbooksService: freshbookService)
+    let freshbooksController = FreshbooksController(clientID: clientID,
+                                                    clientSecret: clientSecret,
+                                                    callbackHost: hostname,
+                                                    freshbooksService: freshbookService)
+    let webhookController = WebhookController(hostName: hostname,
+                                              slackService: slack,
+                                              freshbooksService: freshbookService)
 
     // The logged out view linking to the oauth flow
     router.get { req in

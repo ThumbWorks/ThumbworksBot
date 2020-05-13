@@ -14,26 +14,17 @@ extension URL {
     static let freshbooksUser = URL(string: "https://api.freshbooks.com/auth/api/v1/users/me")!
 }
 
-
-// Errors
-enum FreshbooksError: Error {
-    case invalidURL
-    case noAccessTokenFound
-    case noVerifierAttribute
-}
-
-
-
 final class FreshbooksController {
 
     let callbackHost: String
     let clientSecret: String
     let clientID: String
-
-    init(clientID: String, clientSecret: String, callbackHost: String) {
+    let freshbooksService: FreshbooksWebServicing
+    init(clientID: String, clientSecret: String, callbackHost: String, freshbooksService: FreshbooksWebServicing) {
         self.clientID = clientID
         self.clientSecret = clientSecret
         self.callbackHost = callbackHost
+        self.freshbooksService = freshbooksService
     }
 
     func index(_ req: Request) throws -> EventLoopFuture<View> {

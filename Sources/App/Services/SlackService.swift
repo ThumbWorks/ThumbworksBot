@@ -48,3 +48,17 @@ final class SlackWebService: SlackWebServicing {
         }
     }
 }
+
+
+struct SlackWebhookRequestPayload: Content {
+    let text: String
+    let iconEmoji: String?
+    init(text: String, iconEmoji: String? = nil) {
+        self.text = text
+        self.iconEmoji = iconEmoji
+    }
+    enum CodingKeys: String, CodingKey {
+           case text
+           case iconEmoji = "icon_emoji"
+       }
+}

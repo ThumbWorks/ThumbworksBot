@@ -25,20 +25,6 @@ enum WebhookError: Error {
     case unableToParseWebhook
 }
 
-
-struct SlackWebhookRequestPayload: Content {
-    let text: String
-    let iconEmoji: String?
-    init(text: String, iconEmoji: String? = nil) {
-        self.text = text
-        self.iconEmoji = iconEmoji
-    }
-    enum CodingKeys: String, CodingKey {
-           case text
-           case iconEmoji = "icon_emoji"
-       }
-}
-
 final public  class WebhookController {
     let freshbooksService: FreshbooksWebServicing
     let hostName: String
