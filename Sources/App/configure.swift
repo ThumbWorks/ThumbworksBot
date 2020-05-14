@@ -21,6 +21,8 @@ public func configure(_ config: inout Config, _ env: inout Environment, _ servic
 
     /// Register JSON encoder and content config
     contentConfig.use(decoder: jsonDecoder, for: .json)
+    contentConfig.use(decoder: jsonDecoder, for: .jsonAPI)
+
     services.register(contentConfig)
 
     // Register routes to the router

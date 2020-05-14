@@ -33,7 +33,7 @@ extension URL {
 /// @mockable
 protocol FreshbooksWebServicing {
     func deleteWebhook(accountID: String, on req: Request) throws -> EventLoopFuture<Response>
-    func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<HTTPStatus>
+    func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<NewWebhookPayload>
     func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult>
     func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoice>
     func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserFetchResponsePayload>
@@ -127,7 +127,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         return client.delete(url, beforeSend: provider.setHeaders)
     }
 
-    func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<HTTPStatus> {
+    func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<NewWebhookPayload> {
         let callback = NewWebhookCallbackRequest(event: "invoice.create", uri: "\(hostname)/webhooks/ready")
         let requestPayload = CreateWebhookRequestPayload(callback: callback)
         guard let url = URL.freshbooksCallbacksURL(accountID: accountID) else {
@@ -139,23 +139,12 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
             let client = try req.client()
             return client.post(url) { webhookRequest in
                 webhookRequest.http.body = body
-                webhookRequest.http.contentType = .json
+                webhookRequest.http.contentType = .jsonAPI
                 webhookRequest.http.headers.add(name: .authorization, value: "Bearer \(accessToken)")
-            }.flatMap({ (response)  in
-                // for whatever reason, couldn't parse the content properly, reverting to the old way
-                guard let data = response.http.body.data,
-                    let json = try? JSONSerialization.jsonObject(with: data, options: []),
-                    let dict = json as? [String: Any],
-                    let response = dict["response"] as? [String: Any],
-                    let result = response["result"] as? [String: Any],
-                    let callback = result["callback"] as? [String: Any],
-                    let webhookID = callback["callbackid"] as? Int else {
-                        throw FreshbooksError.unableToParseWebhookObject
-                }
-                let user = try req.requireAuthenticated(User.self)
-                let newWebhook = Webhook(webhookID: webhookID, userID: try user.requireID())
-                return newWebhook.save(on: req).transform(to: .ok)
-            })
+            }.flatMap { (response)  in
+                // TODO for whatever reason, couldn't parse the content properly, reverting to the old way
+                return try response.content.decode(NewWebhookPayload.self)
+            }
         }
     }
 
@@ -198,6 +187,19 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
                 let provider = FreshbooksHeaderProvider(accessToken: accessToken)
                 return try req.client().get(URL.freshbooksUser, beforeSend: provider.setHeaders)
                     .flatMap { try $0.content.decode(UserFetchResponsePayload.self) }
+        }
+    }
+}
+
+struct NewWebhookPayload: Content {
+    let response: NewWebhookPayloadResponse
+    struct NewWebhookPayloadResponse: Content {
+        let result: NewWebhookPayloadResult
+    }
+    struct NewWebhookPayloadResult: Content {
+        let callback: NewWebhookPayloadCallback
+        struct NewWebhookPayloadCallback: Content {
+            let callbackid: Int
         }
     }
 }

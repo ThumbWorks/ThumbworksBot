@@ -98,7 +98,10 @@ final public  class WebhookController {
         guard let accessToken = try req.session()["accessToken"] else {
             throw UserError.noAccessToken
         }
-        return try freshbooksService.registerNewWebhook(accountID: accountID, accessToken: accessToken, on: req)
+        return try freshbooksService.registerNewWebhook(accountID: accountID, accessToken: accessToken, on: req).flatMap({ webhookPayload in
+            let newWebhook = Webhook(webhookID: webhookPayload.response.result.callback.callbackid, userID: try user.requireID())
+            return newWebhook.save(on: req).transform(to: .ok)
+        })
     }
 
     /// Show the website describing a user. The website will AJAX to get the it's webhooks
@@ -158,7 +161,8 @@ extension WebhookController {
                 guard let user = user else {
                     throw WebhookError.orphanedWebhook
                 }
-                return try self.freshbooksService.confirmWebhook(accessToken: user.accessToken, on: req)
+                return try self.freshbooksService
+                    .confirmWebhook(accessToken: user.accessToken, on: req)
                     .transform(to: .ok)
             }
         }
