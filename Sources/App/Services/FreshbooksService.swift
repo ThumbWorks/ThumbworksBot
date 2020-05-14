@@ -71,21 +71,16 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         self.clientID = clientID
         self.clientSecret = clientSecret
     }
-
+ 
     func allInvoices(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]> {
 
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
         let client = try req.client()
         return client.get(URL.freshbooksInvoicesURL(accountID: accountID), beforeSend: provider.setHeaders).flatMap { response in
-            do {
-                return try response.content.decode(InvoicesPackage.self).map {  $0.response.result.invoices }
-            }
-            catch {
-                print(error)
-                throw InvoiceError.notParsed
-            }
+            return try response.content.decode(InvoicesPackage.self).map {  $0.response.result.invoices }
         }
     }
+
     func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoice> {
         guard let url = URL.freshbooksInvoiceURL(accountID: accountID, invoiceID: invoiceID) else {
             throw FreshbooksError.invalidURL
@@ -287,26 +282,6 @@ struct InvoicesPackage: Content {
         struct Invoices: Content {
             let invoices: [FreshbooksInvoice]
         }
-    }
-}
-
-struct FreshbooksInvoice: Content, Equatable {
-    let id: Int
-    let status: Int
-    let paymentStatus: String
-    let currentOrganization: String
-    let amount: Amount
-    let createdAt: Date
-
-    struct Amount: Content, Equatable {
-        let amount: String
-        let code: String
-    }
-    enum CodingKeys: String, CodingKey {
-        case status, id, amount
-        case createdAt = "created_at"
-        case paymentStatus = "payment_status"
-        case currentOrganization = "current_organization"
     }
 }
 

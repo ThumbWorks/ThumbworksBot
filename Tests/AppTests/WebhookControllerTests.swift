@@ -20,9 +20,9 @@ class WebhookControllerTests: XCTestCase {
                                            currentOrganization: Emoji.uber.rawValue,
                                            amount: FreshbooksInvoice.Amount(amount: "123", code: "USD"),
                                            createdAt: Date())
-    let business = BusinessPayload(id: 345, name: "Thumbworks", accountID: "accountID123")
+    let business = BusinessPayload(id: 345, name: "Thumbworks", accountID: "businessAccountID")
     lazy var membership = MembershipPayload(id: 123, role: "manager", business: business)
-    lazy var response = UserResponseObject(id: 123, firstName: "rod", lastName: "campbell", businessMemberships: [membership])
+    lazy var userResponseObject = UserResponseObject(id: 123, firstName: "rod", lastName: "campbell", businessMemberships: [membership])
     let freshbooksVerifiedWebhookContent = FreshbooksWebhookTriggeredContent(userID: 1,
                                                                              name: "create an invoice",
                                                                              objectID: 123,
@@ -37,27 +37,8 @@ class WebhookControllerTests: XCTestCase {
                                                                     accountID: "123")
     let slack = SlackWebServicingMock()
     let freshbooks = FreshbooksWebServicingMock()
+    let userAccessToken = "accessTokenOfUserSavedInDB"
     lazy var controller = WebhookController(hostName: "localhost", slackService: slack, freshbooksService: freshbooks)
-    
-    let confirmWebhookRequestHandler: ((String, Request) throws -> (EventLoopFuture<HTTPStatus>))? = { token, request in
-        let promise = request.eventLoop.newPromise(Response.self)
-        DispatchQueue.global().async {
-            let httpResponse = HTTPResponse(status: .ok, version: .init(major: 1, minor: 1), headers: [:], body: "soundsGood")
-            let response = Response(http: httpResponse, using: request)
-            promise.succeed(result: response)
-        }
-        return promise.futureResult.transform(to: .ok)
-    }
-    
-    let successSlackRequestHandler: ((String, Emoji?, Request) throws -> (EventLoopFuture<Response>))? = { string, emoji, request in
-        let promise = request.eventLoop.newPromise(Response.self)
-        DispatchQueue.global().async {
-            let httpResponse = HTTPResponse(status: .ok, version: .init(major: 1, minor: 1), headers: [:], body: "soundsGood")
-            let response = Response(http: httpResponse, using: request)
-            promise.succeed(result: response)
-        }
-        return promise.futureResult
-    }
     
     var fetchInvoiceHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<FreshbooksInvoice>))? = { a, b, c, request in
         let promise = request.eventLoop.newPromise(FreshbooksInvoice.self)
@@ -68,7 +49,7 @@ class WebhookControllerTests: XCTestCase {
         }
         return promise.futureResult
     }
-    
+
     
     let failSlackRequestHandler: ((Request) throws -> (EventLoopFuture<Response>))? = { request in
         let promise = request.eventLoop.newPromise(Response.self)
@@ -80,16 +61,13 @@ class WebhookControllerTests: XCTestCase {
     
     override func setUp() {
         let req = Request(using: thisApp)
-        
-        let testUser = try? User(responseObject: response, accessToken: "accessToken").save(on: req).wait()
+        let testUser = try? User(responseObject: userResponseObject, accessToken: userAccessToken).save(on: req).wait()
         let _ = try? Webhook(webhookID: 123, userID: try testUser!.requireID()).save(on: req).wait()
     }
+
     override func tearDown() { }
     func testSlackMessageGetsSentOnVerifiedWebhook() throws {
         let req = Request(using: thisApp)
-        // Set up the success case
-        //        slack.sendSlackPayloadHandler =  successSlackRequestHandler
-        
         var expectedEmoji: Emoji? = Emoji.apple
         var expectedSlackPayloadString: String = "shouldChange"
         
@@ -97,13 +75,7 @@ class WebhookControllerTests: XCTestCase {
         slack.sendSlackPayloadHandler = { string, emoji, request in
             expectedEmoji = emoji
             expectedSlackPayloadString = string
-            let promise = request.eventLoop.newPromise(Response.self)
-            DispatchQueue.global().async {
-                let httpResponse = HTTPResponse(status: .ok, version: .init(major: 1, minor: 1), headers: [:], body: "soundsGood")
-                let response = Response(http: httpResponse, using: request)
-                promise.succeed(result: response)
-            }
-            return promise.futureResult
+            return request.successPromiseAfterGlobalDispatchASync()
         }
         
         // use default fetchInvoiceHandler
@@ -122,7 +94,13 @@ class WebhookControllerTests: XCTestCase {
     
     func testFreshbooksVerificationWebhook() throws {
         let req = Request(using: thisApp)
-        freshbooks.confirmWebhookHandler = confirmWebhookRequestHandler
+
+        // Verify that we are able to fetch the user from the database and the access token set is being sent to confirm webhook
+        freshbooks.confirmWebhookHandler = { token, request in
+            XCTAssertEqual(token, self.userAccessToken)
+            return request.successPromiseAfterGlobalDispatchASync()
+        }
+
         do {
             try req.content.encode(freshbooksVerifyContent)
             let status = try controller.ready(req).wait()
@@ -158,5 +136,41 @@ class WebhookControllerTests: XCTestCase {
         } catch {
             XCTFail(error.localizedDescription)
         }
+    }
+
+    func testDeleteWebhook() throws {
+        let req = Request(using: thisApp)
+
+        guard let user = try User.find(1, on: req).wait() else {
+            XCTFail("user not in the test database")
+            return
+        }
+        freshbooks.deleteWebhookHandler = { string, request in
+            XCTAssertNotNil(self.business.accountID)
+            XCTAssertEqual(self.business.accountID, string)
+            return request.successPromiseAfterGlobalDispatchASync()
+        }
+
+        try req.authenticate(user)
+
+        // fetch the invoice
+        _ = try controller.deleteWebhook(req).map({ response -> Response in
+            print(response)
+            return response
+        }).wait()
+    }
+
+
+}
+
+extension Request {
+    fileprivate func successPromiseAfterGlobalDispatchASync() -> EventLoopFuture<Response> {
+        let promise = eventLoop.newPromise(Response.self)
+        DispatchQueue.global().async {
+            let httpResponse = HTTPResponse(status: .ok, version: .init(major: 1, minor: 1), headers: [:], body: "soundsGood")
+            let response = Response(http: httpResponse, using: self)
+            promise.succeed(result: response)
+        }
+        return promise.futureResult
     }
 }

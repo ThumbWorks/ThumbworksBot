@@ -10,12 +10,12 @@ enum RouterError: Error {
 /// Register your application's routes here.
 public func routes(_ router: Router) throws {
     let hostname = "https://thumbworksbot.ngrok.io"
-       guard let clientID = Environment.get("thumbworksbot_app_freshbooks_client_id") else {
-           throw RouterError.missingClientID
-       }
-       guard let clientSecret = Environment.get("thumbworksbot_app_freshbooks_secret") else {
-           throw RouterError.missingClientSecret
-       }
+    guard let clientID = Environment.get("thumbworksbot_app_freshbooks_client_id") else {
+        throw RouterError.missingClientID
+    }
+    guard let clientSecret = Environment.get("thumbworksbot_app_freshbooks_secret") else {
+        throw RouterError.missingClientSecret
+    }
     guard let urlString = Environment.get("thumbworksbot_app_freshbooks_slack_message_url"), let slackMessageURL = URL(string: urlString) else {
         throw RouterError.missingSlackURL
     }

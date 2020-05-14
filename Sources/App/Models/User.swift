@@ -47,24 +47,8 @@ extension User {
 
     var webhooks: Children<User, Webhook> {
         return children(\.userID)
-      }
-}
-
-final class Webhook: SQLiteModel, Codable {
-    var id: Int?
-    var webhookID: Int
-    var userID: Int
-
-    init(webhookID: Int, userID: Int) {
-        self.webhookID = webhookID
-        self.userID = userID
+    }
+    var invoices: Children<User, FreshbooksInvoice> {
+           return children(\.userID)
     }
 }
-
-extension Webhook {
-    var user: Parent<Webhook, User> {
-        return parent(\.userID)
-    }
-
-}
-extension Webhook: Migration { }
