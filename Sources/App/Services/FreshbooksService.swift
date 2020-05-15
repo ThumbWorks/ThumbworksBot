@@ -14,7 +14,10 @@ extension URL {
     static let freshbooksAuth = URL(string: "\(String.freshbooksAPIHost)/auth/oauth/token")!
     static let freshbooksUser = URL(string: "\(String.freshbooksAPIHost)/auth/api/v1/users/me")!
 
-    static func freshbooksInvoicesURL(accountID: String) -> URL {
+    static func freshbooksInvoicesURL(accountID: String, page: Int?) -> URL {
+        if let page = page {
+            return URL(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/invoices/invoices?page=\(page)")!
+        }
         return URL(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/invoices/invoices")!
     }
     static func freshbooksInvoiceURL(accountID: String, invoiceID: Int) -> URL? {
@@ -37,7 +40,7 @@ protocol FreshbooksWebServicing {
     func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult>
     func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoice>
     func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserFetchResponsePayload>
-    func allInvoices(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]>
+    func allInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]>
     func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<Response>
     func auth(with code: String, on req: Request) throws -> EventLoopFuture<TokenExchangeResponse>
 }
@@ -62,6 +65,7 @@ class FreshbooksHeaderProvider {
 }
 
 final class FreshbooksWebservice: FreshbooksWebServicing {
+  
     let clientSecret: String
     let clientID: String
     let hostname: String
@@ -71,13 +75,26 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         self.clientID = clientID
         self.clientSecret = clientSecret
     }
- 
-    func allInvoices(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]> {
+
+    // An attempt was made to add this call with a job
+    func allInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]> {
 
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
         let client = try req.client()
-        return client.get(URL.freshbooksInvoicesURL(accountID: accountID), beforeSend: provider.setHeaders).flatMap { response in
-            return try response.content.decode(InvoicesPackage.self).map {  $0.response.result.invoices }
+        return client.get(URL.freshbooksInvoicesURL(accountID: accountID, page: page), beforeSend: provider.setHeaders).flatMap { response in
+
+            return try response.content.decode(InvoicesPackage.self).flatMap({ invoicesPackage  in
+                let thisPageInvoices = invoicesPackage.response.result.invoices.compactMap { invoice -> EventLoopFuture<FreshbooksInvoice> in
+                    let savedInvoice =  invoice.save(on: req)
+                    print(savedInvoice)
+                    return savedInvoice
+                }.flatten(on: req)
+                let result = invoicesPackage.response.result
+                if result.page < result.pages {
+                    _ = try self.allInvoices(accountID: accountID, accessToken: accessToken, page: result.page + 1, on: req)
+                }
+                return thisPageInvoices
+            })
         }
     }
 
@@ -282,6 +299,8 @@ struct InvoicesPackage: Content {
     struct InvoicesResult: Content {
         let result: Invoices
         struct Invoices: Content {
+            let pages: Int
+            let page: Int
             let invoices: [FreshbooksInvoice]
         }
     }

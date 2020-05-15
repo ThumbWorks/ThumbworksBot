@@ -4,6 +4,7 @@ import Vapor
 
 struct FreshbooksInvoice: SQLiteModel, Equatable {
     var id: Int?
+    var freshbooksID: Int
 //    let id: Int
     let status: Int
     var userID: Int?
@@ -17,7 +18,9 @@ struct FreshbooksInvoice: SQLiteModel, Equatable {
         let code: String
     }
     enum CodingKeys: String, CodingKey {
-        case status, id, amount, userID
+        case id = "_id"
+        case status, amount, userID
+        case freshbooksID = "id"
         case createdAt = "created_at"
         case paymentStatus = "payment_status"
         case currentOrganization = "current_organization"

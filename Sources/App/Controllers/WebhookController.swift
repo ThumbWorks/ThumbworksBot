@@ -81,7 +81,28 @@ final public  class WebhookController {
         guard let accessToken = try req.session()["accessToken"] else {
             throw UserError.noAccessToken
         }
-        return try freshbooksService.allInvoices(accountID: accountID, accessToken: accessToken, req: req)
+        return FreshbooksInvoice.query(on: req).all().flatMap({ (invoices) in
+            print("totalInvoices \(invoices.count)")
+            let total = invoices.reduce(0.0, { x, invoiceAmount in
+                guard let amount = Double(invoiceAmount.amount.amount) else {
+                    return 0
+                }
+                return x + amount
+            })
+            print(total)
+            return try self.freshbooksService
+                .allInvoices(accountID: accountID, accessToken: accessToken, page: 1, on: req)
+                .do({ invoices in
+                    
+                    let total = invoices.reduce(0.0, { x, invoice in
+                        guard let amount = Double(invoice.amount.amount) else {
+                            return 0
+                        }
+                        return x + amount
+                    })
+                    print(total)
+            })
+        })
     }
 
     func getInvoice(accountID: String, invoiceID: Int, accessToken: String, on req: Request) throws -> EventLoopFuture<FreshbooksInvoice> {
