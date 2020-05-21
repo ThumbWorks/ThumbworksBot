@@ -27,25 +27,22 @@ enum Emoji: String {
 }
 /// @mockable
 protocol SlackWebServicing {
-    func sendSlackPayload(text: String, with emoji: Emoji?, on req: Request) throws -> EventLoopFuture<Response>
+    func sendSlackPayload(text: String, with emoji: Emoji?, on req: Request) throws -> EventLoopFuture<ClientResponse>
     var req: Request? { get set }
 }
 
 final class SlackWebService: SlackWebServicing {
-    let slackURL: URL
+    let slackURL: URI
     var req: Request?
 
-    init(slackURL: URL) {
+    init(slackURL: URI) {
         self.slackURL = slackURL
     }
 
-    func sendSlackPayload(text: String, with emoji: Emoji?, on req: Request) throws -> EventLoopFuture<Response> {
-        return try SlackWebhookRequestPayload(text: text, iconEmoji: emoji?.symbol).encode(for: req).flatMap { slackRequestPayload in
-            try req.client()
-                .post(self.slackURL) { slackMessagePost in
-                    slackMessagePost.http.body = slackRequestPayload.http.body
-            }
-        }
+    func sendSlackPayload(text: String, with emoji: Emoji?, on req: Request) throws -> EventLoopFuture<ClientResponse> {
+        return req.client.post(self.slackURL) { request in
+            try request.content.encode(SlackWebhookRequestPayload(text: text, iconEmoji: emoji?.symbol))
+        }.map { $0 }
     }
 }
 

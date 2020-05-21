@@ -7,17 +7,19 @@
 
 import Vapor
 import Leaf
-import FluentSQLite
 import AuthenticationServices
+import Fluent
 
 final class FreshbooksController {
+    let app: Application
     let freshbooksService: FreshbooksWebServicing
-    init(freshbooksService: FreshbooksWebServicing) {
+    init(freshbooksService: FreshbooksWebServicing, app: Application) {
         self.freshbooksService = freshbooksService
+        self.app = app
     }
 
     func index(_ req: Request) throws -> EventLoopFuture<View> {
-        return try req.view().render("UserWebhooks")
+        return req.view.render("UserWebhooks")
     }
 
     func webhook(_ req: Request) throws -> HTTPStatus {
@@ -26,48 +28,45 @@ final class FreshbooksController {
 
     func accessToken(_ req: Request) throws -> HTTPStatus {
         let codeContainer = try req.query.decode(AuthRequest.self)
-        try req.session()["accessToken"] = codeContainer.code
+        req.session.data["accessToken"] = codeContainer.code
         return .ok
     }
 
     func freshbooksAuth(_ req: Request) throws -> EventLoopFuture<View> {
         let codeContainer = try req.query.decode(AuthRequest.self)
         return try freshbooksService.auth(with: codeContainer.code, on: req).flatMap({ (tokenResponse) -> EventLoopFuture<View> in
-            try req.session()["accessToken"] = tokenResponse.accessToken
-            return try self.freshbooksService
-                .fetchUser(accessToken: tokenResponse.accessToken, on: req)
-                .queryUser(on: req)
-                .showUserWebhookView(on: req)
-        })
-    }
-}
-
-extension EventLoopFuture where T == UserFetchResponsePayload {
-    func queryUser(on req: Request) throws -> EventLoopFuture<User> {
-        flatMap { userResponse -> EventLoopFuture<User> in
-            return User.query(on: req).filter(\.freshbooksID == userResponse.response.id).first().flatMap { user in
-                let savableUser: User
-                if let user = user {
-                    // If yes, update
-                    savableUser = user
-                    savableUser.updateUser(responseObject: userResponse.response, accessToken: try req.session()["accessToken"] ?? "")
-                } else {
-                    // If no, create
-                    savableUser = User(responseObject: userResponse.response, accessToken: try req.session()["accessToken"] ?? "")
+            req.session.data["accessToken"] = tokenResponse.accessToken
+            do {
+                return try self.freshbooksService
+                    .fetchUser(accessToken: tokenResponse.accessToken, on: req)
+                    .flatMap { userResponse -> EventLoopFuture<Void> in
+                        print(userResponse)
+                        let userID = userResponse.response.id
+                        return User.query(on: req.db)
+                            .filter(\.$freshbooksID, .equal, userID)
+                            .first()
+                            .flatMap { user  in
+                                let savableUser: User
+                                if let user = user {
+                                    // If yes, update
+                                    savableUser = user
+                                    savableUser.updateUser(responseObject: userResponse.response, accessToken: tokenResponse.accessToken)
+                                } else {
+                                    // If no, create
+                                    savableUser = User(responseObject: userResponse.response, accessToken: tokenResponse.accessToken)
+                                }
+                                return savableUser.save(on: req.db).flatMapThrowing { Void  in
+                                    return try savableUser.addMemberships(from: userResponse.response, on: req)
+                                }.flatMap { user in
+                                    return UserSessionAuthenticator().authenticate(sessionID: tokenResponse.accessToken, for: req)
+                                }
+                        }
                 }
-                // try req.authenticate(savableUser)
-                try req.authenticateSession(savableUser)
-                return savableUser.save(on: req)
+                .flatMap { _ in req.view.render("SetCookie") }
+            } catch {
+                return req.eventLoop.makeFailedFuture(error)
             }
-        }
-    }
-}
-
-extension EventLoopFuture where T == User {
-    func showUserWebhookView(on req: Request) throws -> EventLoopFuture<View> {
-        return flatMap { _ in
-            return try req.view().render("SetCookie")
-        }
+        })
     }
 }
 
@@ -111,6 +110,7 @@ struct UserResponseObject: Content {
 }
 
 struct MembershipPayload: Content {
+
     let id: Int
     let role: String
     let business: BusinessPayload

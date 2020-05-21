@@ -6,9 +6,7 @@
 //
 
 import Vapor
-import Authentication
-
-
+import Fluent
 enum UserError: Error {
     case noUserWithThatAccessToken
     case noAccessToken
@@ -56,144 +54,189 @@ final public  class WebhookController {
     // The webhook payload looks like this:
     // http://your_server.com/webhooks/ready?name=invoice.create&object_id=1234567&account_id=6BApk&user_id=1
     public func ready(_ req: Request) throws ->  EventLoopFuture<HTTPStatus> {
-        return try req.content.decode(FreshbooksWebhookTriggeredContent.self)
-            .flatMap { triggeredPayload in
-                if let _  = triggeredPayload.verifier {
-                    return try self.verifyWebhook(webhookID: triggeredPayload.objectID, on: req).transform(to: .ok)
-                }
-                return try self.executeWebhook(on: req).transform(to: .ok)
+//        return req.client.post(self.slackURL) { request in
+//                  try request.content.encode(SlackWebhookRequestPayload(text: text, iconEmoji: emoji?.symbol))
+//              }.map { $0 }
+
+        let triggeredPayload = try req.content.decode(FreshbooksWebhookTriggeredContent.self)
+        if let _  = triggeredPayload.verifier {
+            return try self.verifyWebhook(webhookID: triggeredPayload.objectID, on: req).transform(to: .ok)
+        }
+        return try self.executeWebhook(on: req).transform(to: .ok)
+    }
+
+    func deleteWebhook(_ req: Request) throws -> EventLoopFuture<ClientResponse> {
+        let user = try req.auth.require(User.self)
+        return user.accountID(on: req).flatMap { accountID in
+            do {
+                return try self.freshbooksService.deleteWebhook(accountID: accountID, on: req)
+            } catch {
+                return req.eventLoop.makeFailedFuture(error)
+            }
         }
     }
 
-    func deleteWebhook(_ req: Request) throws -> EventLoopFuture<Response> {
-        let user = try req.requireAuthenticated(User.self)
-        guard let accountID = user.accountID() else {
-            throw UserError.noAccountID
-        }
-        return try freshbooksService.deleteWebhook(accountID: accountID, on: req)
-    }
-
-    func getInvoices(_ req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]> {
-        let user = try req.requireAuthenticated(User.self)
-        guard let accountID = user.accountID() else {
-            throw UserError.noAccountID
-        }
-        guard let accessToken = try req.session()["accessToken"] else {
-            throw UserError.noAccessToken
-        }
-        return FreshbooksInvoice.query(on: req).all().flatMap({ (invoices) in
-            print("totalInvoices \(invoices.count)")
-            let total = invoices.reduce(0.0, { x, invoiceAmount in
-                guard let amount = Double(invoiceAmount.amount.amount) else {
-                    return 0
-                }
-                return x + amount
-            })
-            print(total)
-            return try self.freshbooksService
-                .allInvoices(accountID: accountID, accessToken: accessToken, page: 1, on: req)
-                .do({ invoices in
-                    
-                    let total = invoices.reduce(0.0, { x, invoice in
-                        guard let amount = Double(invoice.amount.amount) else {
-                            return 0
-                        }
-                        return x + amount
-                    })
-                    print(total)
-            })
-        })
-    }
+//    func getInvoices(_ req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]> {
+//        let user = try req.auth.require(User.self)
+//        guard let accountID = user.accountID() else {
+//            throw UserError.noAccountID
+//        }
+//        guard let accessToken = req.session.data["accessToken"] else {
+//            throw UserError.noAccessToken
+//        }
+//        return FreshbooksInvoice.query(on: req.db).all().flatMapThrowing({ (invoices) in
+//            print("totalInvoices \(invoices.count)")
+//            let total = invoices.reduce(0.0, { x, invoiceAmount in
+//                guard let amount = Double(invoiceAmount.amount.amount) else {
+//                    return 0
+//                }
+//                return x + amount
+//            })
+//            print(total)
+//            return try self.freshbooksService
+//                .allInvoices(accountID: accountID, accessToken: accessToken, page: 1, on: req)
+//                .do({ invoices in
+//                    
+//                    let total = invoices.reduce(0.0, { x, invoice in
+//                        guard let amount = Double(invoice.amount.amount) else {
+//                            return 0
+//                        }
+//                        return x + amount
+//                    })
+//                    print(total)
+//            })
+//        })
+//    }
 
     func getInvoice(accountID: String, invoiceID: Int, accessToken: String, on req: Request) throws -> EventLoopFuture<FreshbooksInvoice> {
         return try freshbooksService.fetchInvoice(accountID: accountID, invoiceID: invoiceID, accessToken: accessToken, req: req)
     }
 
     func registerNewWebhook(_ req: Request) throws -> EventLoopFuture<HTTPStatus> {
-        let user = try req.requireAuthenticated(User.self)
+        let user = try req.auth.require(User.self)
 
-        guard let accountID = user.accountID() else {
-            throw UserError.noAccountID
-        }
+        return user.accountID(on: req).flatMap { accountID in
+            do {
+                guard let accessToken = req.session.data["accessToken"] else {
+                    throw UserError.noAccessToken
+                }
 
-        guard let accessToken = try req.session()["accessToken"] else {
-            throw UserError.noAccessToken
+                let webhookPayload = try self.freshbooksService.registerNewWebhook(accountID: accountID, accessToken: accessToken, on: req)
+                return webhookPayload.flatMap { payload in
+                    do {
+                        let callbackID = payload.response.result.callback.callbackid
+                        let newWebhook = Webhook(webhookID: callbackID, userID: try user.requireID())
+                        return newWebhook.create(on: req.db).map { _ in HTTPStatus.ok }
+                    } catch {
+                        return req.eventLoop.makeFailedFuture(error)
+
+                    }
+                }
+            } catch {
+                return req.eventLoop.makeFailedFuture(error)
+            }
+
         }
-        return try freshbooksService.registerNewWebhook(accountID: accountID, accessToken: accessToken, on: req).flatMap({ webhookPayload in
-            let newWebhook = Webhook(webhookID: webhookPayload.response.result.callback.callbackid, userID: try user.requireID())
-            return newWebhook.save(on: req).transform(to: .ok)
-        })
     }
 
     /// Show the website describing a user. The website will AJAX to get the it's webhooks
     func webhooks(_ req: Request) throws -> EventLoopFuture<View> {
-        return try req.view().render("UserWebhooks")
+        return req.view.render("UserWebhooks")
     }
 
     /// JSON describing the user's webhooks
     func allWebhooks(_ req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult> {
-        let user = try req.requireAuthenticated(User.self)
-        let membershipWithAccountID = user.businessMemberships.first { membership -> Bool in
-            return membership.business.accountID != nil
+        let user = try req.auth.require(User.self)
+        let accessToken = user.accessToken
+        return Business
+            .query(on: req.db)
+            .first()
+            .unwrap(or: Abort(.notFound)).flatMap { business in
+                do {
+                    return try self.freshbooksService.fetchWebhooks(accountID: business.accountID, accessToken: accessToken, req: req)
+                } catch {
+                    return req.eventLoop.makeFailedFuture(error)
+                }
         }
-        guard let accountID = membershipWithAccountID?.business.accountID else {
-            throw UserError.noAccountID
-        }
-        guard let accessToken = try req.session()["accessToken"] else {
-            throw UserError.noAccessToken
-        }
-        return try freshbooksService.fetchWebhooks(accountID: accountID, accessToken: accessToken, req: req)
     }
 
 }
 
 extension WebhookController {
-    private func executeWebhook(on req: Request) throws ->  EventLoopFuture<Response> {
-        return try req.content.decode(FreshbooksWebhookTriggeredContent.self)
-            .flatMap { triggeredPayload in
-                return User.find(triggeredPayload.userID, on: req).flatMap { user in
-                    guard let user = user else {
-                        throw WebhookError.orphanedWebhook
-                    }
-
-                    guard let accountID = user.accountID() else {
-                        throw UserError.noAccountID
-                    }
-                    let objectID = triggeredPayload.objectID
-                    return try self.getInvoice(accountID: accountID,
-                                               invoiceID: objectID,
-                                               accessToken: user.accessToken,
-                                               on: req)
-                        .flatMap({ invoice in
-                            let text = "New invoice created to \(invoice.currentOrganization), for \(invoice.amount.amount) \(invoice.amount.code)"
-                            let emoji = Emoji(rawValue: invoice.currentOrganization)
-                            return try self.slackService.sendSlackPayload(text: text, with:emoji, on: req)
-                        })
+    private func executeWebhook(on req: Request) throws ->  EventLoopFuture<HTTPStatus> {
+        let triggeredPayload = try req.content.decode(FreshbooksWebhookTriggeredContent.self)
+        return User.query(on: req.db).all().flatMap { allUsers in
+            let user = allUsers.first
+//        }
+            //        return User.find(triggeredPayload.freshbooksUserID, on: req.db).flatMap { user in
+            do {
+                guard let user = user else {
+                    throw WebhookError.orphanedWebhook
                 }
+                return user.accountID(on: req).flatMap { accountID in
+                    do {
+                        let objectID = triggeredPayload.objectID
+                        return try self.getInvoice(accountID: accountID,
+                                                   invoiceID: objectID,
+                                                   accessToken: user.accessToken,
+                                                   on: req)
+                            .flatMap({ invoice in
+                                let text = "New invoice created to \(invoice.currentOrganization), for \(invoice.amount.amount) \(invoice.amount.code)"
+                                let emoji = Emoji(rawValue: invoice.currentOrganization)
+                                do {
+                                    return try self.slackService.sendSlackPayload(text: text, with:emoji, on: req).transform(to: .ok)
+                                }
+                                catch {
+                                    return req.eventLoop.makeFailedFuture(error)
+                                }
+                            })
+                    } catch {
+                        return req.eventLoop.makeFailedFuture(error)
+                    }
+                }
+            } catch {
+                return req.eventLoop.makeFailedFuture(error)
+            }
         }
     }
 
     private func verifyWebhook(webhookID: Int, on req: Request) throws ->  EventLoopFuture<HTTPStatus> {
-        return Webhook.query(on: req).filter(\.webhookID == webhookID).first().flatMap { webhook in
-            guard let webhook = webhook else {
-                throw WebhookError.webhookNotFound
-            }
-            return User.find(webhook.userID, on: req).flatMap { user in
-                guard let user = user else {
-                    throw WebhookError.orphanedWebhook
+        //        return Webhook.query(on: req.db).filter(\.webhookID == webhookID).first().flatMap { webhook in
+        // TODO need to figure out how to filter queries
+        return Webhook.query(on: req.db).first().flatMap { webhook in
+            do {
+                guard let webhook = webhook else {
+                    throw WebhookError.webhookNotFound
                 }
-                return try self.freshbooksService
-                    .confirmWebhook(accessToken: user.accessToken, on: req)
-                    .transform(to: .ok)
+                return User.find(webhook.userID, on: req.db).flatMap { user in
+                    do {
+                        guard let user = user else {
+                            throw WebhookError.orphanedWebhook
+                        }
+
+                        return try self.freshbooksService
+                            .confirmWebhook(accessToken: user.accessToken, on: req)
+                            .transform(to: .ok)
+                    } catch {
+                        return req.eventLoop.makeFailedFuture(error)
+                    }
+                }
+            } catch {
+                return req.eventLoop.makeFailedFuture(error)
             }
         }
     }
 }
-
 extension User {
-    func accountID() -> String? {
-        return businessMemberships.first { membership -> Bool in
-            return membership.business.accountID != nil
-            }?.business.accountID
+    func accountID(on req: Request) -> EventLoopFuture<String> {
+        return Business // TODO ok we aren't actually creating these
+            .query(on: req.db)
+            .first()
+            .unwrap(or: Abort(.notFound)).map { business in
+                return business.accountID
+        }
+//        return businessMemberships.first { membership -> Bool in
+//            return membership.business.accountID != nil
+//            }?.business.accountID
     }
 }

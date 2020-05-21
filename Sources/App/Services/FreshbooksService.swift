@@ -10,38 +10,39 @@ import Vapor
 extension String {
     static let freshbooksAPIHost = "https://api.freshbooks.com"
 }
-extension URL {
-    static let freshbooksAuth = URL(string: "\(String.freshbooksAPIHost)/auth/oauth/token")!
-    static let freshbooksUser = URL(string: "\(String.freshbooksAPIHost)/auth/api/v1/users/me")!
+extension URI {
+    static let freshbooksAuth = URI(string: "\(String.freshbooksAPIHost)/auth/oauth/token")
 
-    static func freshbooksInvoicesURL(accountID: String, page: Int?) -> URL {
+    static let freshbooksUser = URI(string: "\(String.freshbooksAPIHost)/auth/api/v1/users/me")
+
+    static func freshbooksInvoicesURL(accountID: String, page: Int?) -> URI {
         if let page = page {
-            return URL(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/invoices/invoices?page=\(page)")!
+            return URI(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/invoices/invoices?page=\(page)")
         }
-        return URL(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/invoices/invoices")!
+        return URI(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/invoices/invoices")
     }
-    static func freshbooksInvoiceURL(accountID: String, invoiceID: Int) -> URL? {
-        return URL(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/invoices/invoices/\(invoiceID)")
-    }
-
-    static func freshbooksCallbackURL(accountID: String, objectID: Int) -> URL? {
-        return URL(string: "\(String.freshbooksAPIHost)/events/account/\(accountID)/events/callbacks/\(objectID)")
+    static func freshbooksInvoiceURL(accountID: String, invoiceID: Int) -> URI {
+        return URI(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/invoices/invoices/\(invoiceID)")
     }
 
-    static func freshbooksCallbacksURL(accountID: String) -> URL? {
-        return URL(string: "\(String.freshbooksAPIHost)/events/account/\(accountID)/events/callbacks")
+    static func freshbooksCallbackURL(accountID: String, objectID: Int) -> URI {
+        return URI(string: "\(String.freshbooksAPIHost)/events/account/\(accountID)/events/callbacks/\(objectID)")
+    }
+
+    static func freshbooksCallbacksURL(accountID: String) -> URI {
+        return URI(string: "\(String.freshbooksAPIHost)/events/account/\(accountID)/events/callbacks")
     }
 }
 
 /// @mockable
 protocol FreshbooksWebServicing {
-    func deleteWebhook(accountID: String, on req: Request) throws -> EventLoopFuture<Response>
+    func deleteWebhook(accountID: String, on req: Request) throws -> EventLoopFuture<ClientResponse>
     func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<NewWebhookPayload>
     func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult>
     func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoice>
     func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserFetchResponsePayload>
-    func allInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]>
-    func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<Response>
+//    func allInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]>
+    func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse>
     func auth(with code: String, on req: Request) throws -> EventLoopFuture<TokenExchangeResponse>
 }
 
@@ -49,23 +50,31 @@ class FreshbooksHeaderProvider {
     let accessToken: String
     let response: Response?
 
+    func headers() -> HTTPHeaders {
+        var headers = HTTPHeaders()
+        headers.add(name: .contentType, value: "application/json")
+        headers.add(name: .accept, value: "application/json")
+        headers.add(name: "Api-Version", value: "alpha")
+        headers.add(name: .authorization, value: "Bearer \(accessToken)")
+        return headers
+    }
     init(accessToken: String, bodyContent: Response? = nil) {
         self.accessToken = accessToken
         self.response = bodyContent
     }
-    func setHeaders(request: Request) throws -> () {
-        if let response = response?.http.body {
-            request.http.body = response
-        }
-        request.http.contentType = .json
-        request.http.headers.add(name: .accept, value: "application/json")
-        request.http.headers.add(name: "Api-Version", value: "alpha")
-        request.http.headers.add(name: .authorization, value: "Bearer \(accessToken)")
-    }
+//    func setHeaders(request: Request) throws -> () {
+//        if let response = response?.http.body {
+//            request.http.body = response
+//        }
+//        request.http.contentType = .json
+//        request.http.headers.add(name: .accept, value: "application/json")
+//        request.http.headers.add(name: "Api-Version", value: "alpha")
+//        request.http.headers.add(name: .authorization, value: "Bearer \(accessToken)")
+//    }
 }
 
 final class FreshbooksWebservice: FreshbooksWebServicing {
-  
+
     let clientSecret: String
     let clientID: String
     let hostname: String
@@ -77,107 +86,116 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
     }
 
     // An attempt was made to add this call with a job
-    func allInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]> {
+//    func allInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]> {
+//
+//        let provider = FreshbooksHeaderProvider(accessToken: accessToken)
+//        let client = req.client
+//        return client.get(URI.freshbooksInvoicesURL(accountID: accountID, page: page), headers: provider.headers())
+//            .flatMapThrowing { clientResponse in
+//                let invoicesPackage = try clientResponse.content.decode(InvoicesPackage.self)
+//                let thisPageInvoices = invoicesPackage.response.result.invoices.compactMap { invoice -> EventLoopFuture<FreshbooksInvoice> in
+//                    print(invoice.amount.amount)
+//                    let savedInvoice =  invoice.save(on: req)
+//                    return savedInvoice
+//                }
+//                let result = invoicesPackage.response.result
+//                if result.page < result.pages {
+//                    _ = try self.allInvoices(accountID: accountID, accessToken: accessToken, page: result.page + 1, on: req)
+//                }
+//                return thisPageInvoices
+//        })
 
-        let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-        let client = try req.client()
-        return client.get(URL.freshbooksInvoicesURL(accountID: accountID, page: page), beforeSend: provider.setHeaders).flatMap { response in
-
-            return try response.content.decode(InvoicesPackage.self).flatMap({ invoicesPackage  in
-                let thisPageInvoices = invoicesPackage.response.result.invoices.compactMap { invoice -> EventLoopFuture<FreshbooksInvoice> in
-                    let savedInvoice =  invoice.save(on: req)
-                    print(savedInvoice)
-                    return savedInvoice
-                }.flatten(on: req)
-                let result = invoicesPackage.response.result
-                if result.page < result.pages {
-                    _ = try self.allInvoices(accountID: accountID, accessToken: accessToken, page: result.page + 1, on: req)
-                }
-                return thisPageInvoices
-            })
-        }
-    }
+//        return client.get(URI.freshbooksInvoicesURL(accountID: accountID, page: page), beforeSend: provider.headers()).flatMap { response in
+//
+//            return try response.content.decode(InvoicesPackage.self).flatMap({ invoicesPackage  in
+//                let thisPageInvoices = invoicesPackage.response.result.invoices.compactMap { invoice -> EventLoopFuture<FreshbooksInvoice> in
+//                    print(invoice.amount.amount)
+//                    let savedInvoice =  invoice.save(on: req)
+//                    return savedInvoice
+//                }.flatten(on: req)
+//                let result = invoicesPackage.response.result
+//                if result.page < result.pages {
+//                    _ = try self.allInvoices(accountID: accountID, accessToken: accessToken, page: result.page + 1, on: req)
+//                }
+//                return thisPageInvoices
+//            })
+//        }
+//    }
 
     func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoice> {
-        guard let url = URL.freshbooksInvoiceURL(accountID: accountID, invoiceID: invoiceID) else {
-            throw FreshbooksError.invalidURL
-        }
-        let client = try req.client()
+        let url = URI.freshbooksInvoiceURL(accountID: accountID, invoiceID: invoiceID)
+        let client = req.client
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
 
-        return client.get(url, beforeSend: provider.setHeaders).flatMap { response in
-            try response.content.decode(InvoicePackage.self).map({ package  in
-                return package.response.result.invoice
-            })
+        return client.get(url, headers: provider.headers()).flatMapThrowing { response in
+            let package = try response.content.decode(InvoicePackage.self)
+            return package.response.result.invoice
         }
     }
 
-    func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<Response> {
-        let client = try req.client()
-        return try req.content.decode(FreshbooksWebhookTriggeredContent.self).flatMap { payload in
-            guard let url = URL.freshbooksCallbackURL(accountID: payload.accountID, objectID: payload.objectID) else {
-                throw FreshbooksError.invalidURL
-            }
-            guard let verifier = payload.verifier else {
-                throw FreshbooksError.noVerifierAttribute
-            }
-            let callback = FreshbooksCallback(callbackID: payload.objectID, verifier: verifier)
-            return try FreshbookConfirmReadyPayload(callback: callback)
-                .encode(for: req)
-                .flatMap { confirmedReadyPayload in
-                    let provider = FreshbooksHeaderProvider(accessToken: accessToken, bodyContent: confirmedReadyPayload)
-                   return client.put(url, beforeSend: provider.setHeaders)
-            }
+    func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse> {
+        let client = req.client
+        let payload = try req.content.decode(FreshbooksWebhookTriggeredContent.self)
+        let url = URI.freshbooksCallbackURL(accountID: payload.accountID, objectID: payload.objectID)
+        guard let verifier = payload.verifier else {
+            throw FreshbooksError.noVerifierAttribute
+        }
+        let callback = FreshbooksCallback(callbackID: payload.objectID, verifier: verifier)
+        let confirmedReadyPayload = FreshbookConfirmReadyPayload(callback: callback)
+            .encodeResponse(for: req)
+
+        return confirmedReadyPayload.flatMap { confirmedReadyPayload  in
+            let provider = FreshbooksHeaderProvider(accessToken: accessToken, bodyContent: confirmedReadyPayload)
+            return client.put(url, headers: provider.headers())
         }
     }
 
-    func deleteWebhook(accountID: String, on req: Request) throws -> EventLoopFuture<Response> {
-        let client = try req.client()
-        guard let accessToken = try req.session()["accessToken"] else {
+    func deleteWebhook(accountID: String, on req: Request) throws -> EventLoopFuture<ClientResponse> {
+        let client = req.client
+        guard let accessToken = req.session.data["accessToken"] else {
             throw UserError.noAccessToken
         }
         let deletePayload = try req.query.decode(DeleteWebhookRequestPayload.self)
-        guard let url = URL.freshbooksCallbackURL(accountID: accountID, objectID: deletePayload.id) else {
-            throw FreshbooksError.invalidURL
-        }
+        let url = URI.freshbooksCallbackURL(accountID: accountID, objectID: deletePayload.id)
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-        return client.delete(url, beforeSend: provider.setHeaders)
+        return client.delete(url, headers: provider.headers())
     }
 
     func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<NewWebhookPayload> {
         let callback = NewWebhookCallbackRequest(event: "invoice.create", uri: "\(hostname)/webhooks/ready")
         let requestPayload = CreateWebhookRequestPayload(callback: callback)
-        guard let url = URL.freshbooksCallbacksURL(accountID: accountID) else {
-            throw FreshbooksError.invalidURL
-        }
-
-        return try requestPayload.encode(using: req).flatMap { request in
-            let body = request.http.body
-            let client = try req.client()
-            return client.post(url) { webhookRequest in
-                webhookRequest.http.body = body
-                webhookRequest.http.contentType = .jsonAPI
-                webhookRequest.http.headers.add(name: .authorization, value: "Bearer \(accessToken)")
-            }.flatMap { (response)  in
-                // TODO for whatever reason, couldn't parse the content properly, reverting to the old way
-                return try response.content.decode(NewWebhookPayload.self)
-            }
+        let url = URI.freshbooksCallbacksURL(accountID: accountID)
+        let client = req.client
+        let provider = FreshbooksHeaderProvider(accessToken: accessToken)
+        return client.post(url, headers: provider.headers()) { webhookRequest in
+            try webhookRequest.content.encode(requestPayload)
+        }.flatMapThrowing {  response -> NewWebhookPayload in
+            let decoded = try response.content.decode(NewWebhookPayload.self)
+            return decoded
         }
     }
 
     func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult> {
-        guard let url = URL.freshbooksCallbacksURL(accountID: accountID) else {
-            throw FreshbooksError.invalidURL
-        }
+        let url = URI.freshbooksCallbacksURL(accountID: accountID)
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-        return try req.client().get(url, beforeSend: provider.setHeaders)
-            .flatMap({ response in
-            response.http.contentType = .json
-            return try response.content.decode(FreshbooksWebhookResponsePayload.self)
-                .flatMap({ payload in
-                    req.future().map { payload.response.result }
-                })
-        })
+
+        return req.client.get(url, headers: provider.headers())
+            .flatMapThrowing { response in
+                return try response.content.decode(FreshbooksWebhookResponsePayload.self).response.result
+        }
+
+//        return req.client.get(url,  headers: provider.headers())
+//            .flatMap({ response in
+////            response.http.contentType = .json
+//                do {
+//                    return try response.content.decode(FreshbooksWebhookResponsePayload.self)
+//                        .flatMap({ payload in
+//                            req.future().map { payload.response.result }
+//                        })
+//                } catch {
+//                    return req.eventLoop.makeFailedFuture(error)
+//                }
+//        })
     }
 
     func auth(with code: String, on req: Request) throws -> EventLoopFuture<TokenExchangeResponse> {
@@ -185,26 +203,49 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
     }
 
     private func exchangeToken(with code: String, on req: Request) throws -> EventLoopFuture<TokenExchangeResponse>{
-        return try TokenExchangeRequest(clientSecret: clientSecret,
-                                        redirectURI: URL(string: "\(hostname)/freshbooks/auth"),
-                                        clientID: clientID,
-                                        code: code)
-            .encode(using: req)
-            .flatMap { tokenRequest -> EventLoopFuture<TokenExchangeResponse> in
-                return try req.client().post(URL.freshbooksAuth) { request in
-                    request.http.contentType = .json
-                    request.http.body = tokenRequest.http.body
-                }.flatMap { try $0.content.decode(TokenExchangeResponse.self)}
+        let requestPayload = TokenExchangeRequest(clientSecret: clientSecret,
+                                                  redirectURI: URL(string: "\(hostname)/freshbooks/auth"),
+                                                  clientID: clientID,
+                                                  code: code)
+        return req.client.post(URI.freshbooksAuth) { request in
+            request.headers.add(name: .contentType, value: "application/json")
+            try request.content.encode(requestPayload)
+        }.flatMapThrowing { clientResponse in
+            return try clientResponse.content.decode(TokenExchangeResponse.self)
         }
+
+
+        // The vapor 3 way for reference
+//        return try TokenExchangeRequest(clientSecret: clientSecret,
+//                                              redirectURI: URL(string: "\(hostname)/freshbooks/auth"),
+//                                              clientID: clientID,
+//                                              code: code)
+//                  .encode(using: req)
+//                  .flatMap { tokenRequest -> EventLoopFuture<TokenExchangeResponse> in
+//                      return req.client.post(URI.freshbooksAuth) { request in
+//                          request.content.
+//                          request.http.contentType = .json
+//                          request.http.body = tokenRequest.http.body
+//                      }.flatMap { try $0.content.decode(TokenExchangeResponse.self)}
+//              }
     }
 
     func fetchUser(accessToken: String, on req: Request)  throws ->  EventLoopFuture<UserFetchResponsePayload> {
-        return try UserFetchRequest(accessToken: accessToken).encode(for: req)
-            .flatMap { userFetchResponse -> EventLoopFuture<UserFetchResponsePayload> in
-                let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-                return try req.client().get(URL.freshbooksUser, beforeSend: provider.setHeaders)
-                    .flatMap { try $0.content.decode(UserFetchResponsePayload.self) }
+//        let requestPayload = UserFetchRequest(accessToken: accessToken)
+        let provider = FreshbooksHeaderProvider(accessToken: accessToken)
+
+        let userEndpoint = URI.freshbooksUser
+        return req.client.get(userEndpoint, headers: provider.headers())
+        .flatMapThrowing { clientResponse in
+            return try clientResponse.content.decode(UserFetchResponsePayload.self)
         }
+
+//        return try UserFetchRequest(accessToken: accessToken).encode(for: req)
+//            .flatMap { userFetchResponse -> EventLoopFuture<UserFetchResponsePayload> in
+//                let provider = FreshbooksHeaderProvider(accessToken: accessToken)
+//                return req.client.get(URI.freshbooksUser, beforeSend: provider.setHeaders)
+//                    .flatMap { try $0.content.decode(UserFetchResponsePayload.self) }
+//        }
     }
 }
 
@@ -237,14 +278,14 @@ struct FreshbooksCallback: Content {
 //user_id=214214&name=callback.verify&verifier=xf8pxDkZfSXuak7S4qaGQBvxArpMvqR&object_id=778599&account_id=xazq5&system=https%3A%2F%2Fthumbworks.freshbooks.com)
 
 struct FreshbooksWebhookTriggeredContent: Content {
-    let userID: Int
+    let freshbooksUserID: Int
     let name: String
     let objectID: Int
     let verified: Bool?
     let verifier: String?
     let accountID: String
     enum CodingKeys: String, CodingKey {
-        case userID = "user_id"
+        case freshbooksUserID = "user_id"
         case objectID = "object_id"
         case accountID = "account_id"
         case verifier, verified, name
