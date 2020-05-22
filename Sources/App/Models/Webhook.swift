@@ -11,12 +11,9 @@ import FluentSQL
 import FluentSQLiteDriver   
 
 final class Webhook: Model, Codable {
-    static var schema: String = "webhook" // TODO upgrade to v4, /shrug
+    static var schema: String = "webhooks" // TODO upgrade to v4, /shrug
 
-    init() {
-        webhookID = 1 // TODO upgrade to v4
-        userID = UUID() // TODO upgrade to v4
-    }
+    init() {}
 
     typealias Database = SQLiteDatabase
 
@@ -35,19 +32,17 @@ final class Webhook: Model, Codable {
     }
 }
 
-extension Webhook {
-    // TODO remove the relationship during the upgrade
-//    var user: Parent<Webhook, User> {
-//        return parent(\.userID)
-//    }
+struct CreateWebhook: Migration {
+    func prepare(on database: Database) -> EventLoopFuture<Void> {
+        database.schema("webhooks")
+                  .id()
+                  .field("webhookID", .int)
+                  .field("userID", .uuid)
+                  .unique(on: "webhookID")
+                  .create()
+    }
 
+    func revert(on database: Database) -> EventLoopFuture<Void> {
+        database.schema("webhooks").delete()
+    }
 }
-//extension Webhook: Migration {
-//    func prepare(on database: Database) -> EventLoopFuture<Void> {
-//
-//    }
-//
-//    func revert(on database: Database) -> EventLoopFuture<Void> {
-//
-//    }
-//}

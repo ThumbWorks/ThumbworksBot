@@ -44,10 +44,14 @@ final class User: Model {
 
 extension User {
     func addMemberships(from userResponse: UserResponseObject, on req: Request) throws -> EventLoopFuture<Void> {
-        return try userResponse.businessMemberships.map { membershipPayload ->  EventLoopFuture<Void> in
+        return try userResponse.businessMemberships.compactMap { membershipPayload in
             let membership = Membership(membershipPayload: membershipPayload, userID: try self.requireID())
-            return membership.save(on: req.db)
-            // TODO need to a) iterate over all of these and b) save the businesses
+            return membership.save(on: req.db).flatMap { _ in
+                let business = Business(business: membershipPayload.business)
+                return business.save(on: req.db).flatMap { _  in
+                    return membership.$businesses.attach(business, on: req.db)
+                }
+            }
         }.flatten(on: req.eventLoop)
     }
     func updateUser(responseObject: UserResponseObject, accessToken: String) {
@@ -64,10 +68,6 @@ extension User: SessionAuthenticatable {
         return accessToken
     }
 }
-
-//extension User: ModelSessionAuthenticatable {
-//
-//}
 
 struct UserSessionAuthenticator: SessionAuthenticator {
     typealias User = App.User
@@ -102,141 +102,3 @@ struct CreateUser: Migration {
 
 /// Allows `User` to be encoded to and decoded from HTTP messages.
 extension User: Content { }
-
-/// Allows `User` to be used as a dynamic parameter in route definitions.
-//extension User: Parameter { } // TODO upgrade to v4
-
-extension User {
-
-    // TODO upgrade to v4
-//    var webhooks: Children<User, Webhook> {
-//        return children(\.userID)
-//    }
-//    var invoices: Children<User, FreshbooksInvoice> {
-//           return children(\.userID)
-//    }
-}
-
-
-final class MembershipBusiness: Model {
-    // Name of the table or collection.
-    static let schema: String = "membership_business"
-
-    // Unique identifier for this pivot.
-    @ID(key: .id)
-    var id: UUID?
-
-    // Reference to the Tag this pivot relates.
-    @Parent(key: "membership_id")
-    var membership: Membership
-
-    // Reference to the Star this pivot relates.
-    @Parent(key: "business_id")
-    var business: Business
-
-    // Creates a new, empty pivot.
-    init() {}
-
-    // Creates a new pivot with all properties set.
-    init(membershipID: UUID, businessID: UUID) {
-        self.membership.id = membershipID
-        self.business.id = businessID
-    }
-}
-
-struct CreateMembershipBusiness: Migration {
-    func prepare(on database: Database) -> EventLoopFuture<Void> {
-        database.schema("membershipbusiness")
-                   .id()
-//            .field("business", .custom(Business.self))
-//            .field("membership", .custom(Membership.self))
-            .create()
-    }
-
-    func revert(on database: Database) -> EventLoopFuture<Void> {
-                database.schema("membershipbusiness").delete()
-
-    }
-}
-
-final class Membership: Model {
-    static var schema: String = "memberships"
-
-    @ID(key: .id)
-    var id: UUID?
-
-    @Field(key: "role")
-    var role: String
-
-//    @Siblings(key: "business")
-//    var business: Business
-
-    @Field(key: "freshbooksID")
-    var freshbooksID: Int
-
-    @Parent(key: "user_id")
-    var user: User
-
-    init() {}
-
-    init(membershipPayload: MembershipPayload, userID: UUID) {
-//        business = Business(business: membershipPayload.business) // TODO I need to create these
-        role = membershipPayload.role
-        self.$user.id = userID
-    }
-}
-
-struct CreateMembership: Migration {
-    func prepare(on database: Database) -> EventLoopFuture<Void> {
-        database.schema("memberships")
-            .id()
-            .field("role", .string)
-            .field("freshbooksID", .int)
-            .field("user_id", .uuid, .references("users", "id"))
-            .unique(on: "freshbooksID")
-            .create()
-    }
-
-    func revert(on database: Database) -> EventLoopFuture<Void> {
-        database.schema("memberships").delete()
-    }
-}
-
-final class Business: Model {
-    static var schema: String = "businesses"
-
-    @ID(key: .id)
-    var id: UUID?
-
-    @Field(key: "name")
-    var name: String
-
-    @Field(key: "accountID")
-    var accountID: String
-
-    @Field(key: "freshbooksID")
-    var freshbooksID: Int
-
-    init() {}
-    init(business: BusinessPayload) {
-        name = business.name
-        accountID = business.accountID ?? "no accountID"
-        freshbooksID = business.id
-    }
-}
-
-struct CreateBusiness: Migration {
-    func prepare(on database: Database) -> EventLoopFuture<Void> {
-        database.schema("businesses")
-            .id()
-            .field("name", .string)
-            .field("accountID", .string)
-            .field("freshbooksID", .int)
-            .unique(on: "freshbooksID")
-            .create()
-    }
-
-    func revert(on database: Database) -> EventLoopFuture<Void> {
-        database.schema("businesses").delete()
-    }
-}

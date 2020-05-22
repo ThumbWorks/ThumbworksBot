@@ -16,6 +16,7 @@ public func configure(_ app: Application) throws {
     app.migrations.add(CreateMembership())
     app.migrations.add(CreateBusiness())
     app.migrations.add(CreateMembershipBusiness())
+    app.migrations.add(CreateWebhook())
     app.sessions.use(.fluent(.sqlite))
     app.migrations.add(SessionRecord.migration)
 
@@ -23,19 +24,18 @@ public func configure(_ app: Application) throws {
     app.views.use(.leaf)
     /// Create default content config
     // TODO Ok so this now won't parse my dates
-//    var contentConfig = ContentConfig.default()
-//
-//    /// Create custom JSON encoder
-//    let jsonDecoder = JSONDecoder()
-//    let formatter = DateFormatter()
-//    formatter.dateFormat = "YYYY-MM-DD HH:mm:ss"
-//    jsonDecoder.dateDecodingStrategy = .formatted(formatter)
-//
-//    /// Register JSON encoder and content config
-//    contentConfig.use(decoder: jsonDecoder, for: .json)
-//    contentConfig.use(decoder: jsonDecoder, for: .jsonAPI)
 
-//    services.register(contentConfig)
+    let encoder = JSONEncoder()
+
+    let formatter = DateFormatter()
+    formatter.dateFormat = "YYYY-MM-DD HH:mm:ss"
+    encoder.dateEncodingStrategy = .formatted(formatter)
+
+    let decoder = JSONDecoder()
+
+    // override the global encoder used for the `.json` media type
+    ContentConfiguration.global.use(encoder: encoder, for: .json)
+    ContentConfiguration.global.use(decoder: decoder, for: .jsonAPI)
 
     // Register routes to the router
 //    let router = EngineRouter.default()

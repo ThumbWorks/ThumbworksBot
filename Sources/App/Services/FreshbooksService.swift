@@ -36,7 +36,7 @@ extension URI {
 
 /// @mockable
 protocol FreshbooksWebServicing {
-    func deleteWebhook(accountID: String, on req: Request) throws -> EventLoopFuture<ClientResponse>
+    func deleteWebhook(accountID: String, webhookID: Int, on req: Request) throws -> EventLoopFuture<ClientResponse>
     func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<NewWebhookPayload>
     func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult>
     func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoice>
@@ -52,7 +52,6 @@ class FreshbooksHeaderProvider {
 
     func headers() -> HTTPHeaders {
         var headers = HTTPHeaders()
-        headers.add(name: .contentType, value: "application/json")
         headers.add(name: .accept, value: "application/json")
         headers.add(name: "Api-Version", value: "alpha")
         headers.add(name: .authorization, value: "Bearer \(accessToken)")
@@ -150,13 +149,12 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         }
     }
 
-    func deleteWebhook(accountID: String, on req: Request) throws -> EventLoopFuture<ClientResponse> {
+    func deleteWebhook(accountID: String, webhookID: Int, on req: Request) throws -> EventLoopFuture<ClientResponse> {
         let client = req.client
         guard let accessToken = req.session.data["accessToken"] else {
             throw UserError.noAccessToken
         }
-        let deletePayload = try req.query.decode(DeleteWebhookRequestPayload.self)
-        let url = URI.freshbooksCallbackURL(accountID: accountID, objectID: deletePayload.id)
+        let url = URI.freshbooksCallbackURL(accountID: accountID, objectID: webhookID)
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
         return client.delete(url, headers: provider.headers())
     }
@@ -170,6 +168,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         return client.post(url, headers: provider.headers()) { webhookRequest in
             try webhookRequest.content.encode(requestPayload)
         }.flatMapThrowing {  response -> NewWebhookPayload in
+            // TODO we could afford some better error handling here. Attemping to register a webhook after it's already been created gives a 422 and a different payload in the response
             let decoded = try response.content.decode(NewWebhookPayload.self)
             return decoded
         }
@@ -181,21 +180,8 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
 
         return req.client.get(url, headers: provider.headers())
             .flatMapThrowing { response in
-                return try response.content.decode(FreshbooksWebhookResponsePayload.self).response.result
+                try response.content.decode(FreshbooksWebhookResponsePayload.self).response.result
         }
-
-//        return req.client.get(url,  headers: provider.headers())
-//            .flatMap({ response in
-////            response.http.contentType = .json
-//                do {
-//                    return try response.content.decode(FreshbooksWebhookResponsePayload.self)
-//                        .flatMap({ payload in
-//                            req.future().map { payload.response.result }
-//                        })
-//                } catch {
-//                    return req.eventLoop.makeFailedFuture(error)
-//                }
-//        })
     }
 
     func auth(with code: String, on req: Request) throws -> EventLoopFuture<TokenExchangeResponse> {
@@ -213,25 +199,9 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         }.flatMapThrowing { clientResponse in
             return try clientResponse.content.decode(TokenExchangeResponse.self)
         }
-
-
-        // The vapor 3 way for reference
-//        return try TokenExchangeRequest(clientSecret: clientSecret,
-//                                              redirectURI: URL(string: "\(hostname)/freshbooks/auth"),
-//                                              clientID: clientID,
-//                                              code: code)
-//                  .encode(using: req)
-//                  .flatMap { tokenRequest -> EventLoopFuture<TokenExchangeResponse> in
-//                      return req.client.post(URI.freshbooksAuth) { request in
-//                          request.content.
-//                          request.http.contentType = .json
-//                          request.http.body = tokenRequest.http.body
-//                      }.flatMap { try $0.content.decode(TokenExchangeResponse.self)}
-//              }
     }
 
     func fetchUser(accessToken: String, on req: Request)  throws ->  EventLoopFuture<UserFetchResponsePayload> {
-//        let requestPayload = UserFetchRequest(accessToken: accessToken)
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
 
         let userEndpoint = URI.freshbooksUser
@@ -239,13 +209,6 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         .flatMapThrowing { clientResponse in
             return try clientResponse.content.decode(UserFetchResponsePayload.self)
         }
-
-//        return try UserFetchRequest(accessToken: accessToken).encode(for: req)
-//            .flatMap { userFetchResponse -> EventLoopFuture<UserFetchResponsePayload> in
-//                let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-//                return req.client.get(URI.freshbooksUser, beforeSend: provider.setHeaders)
-//                    .flatMap { try $0.content.decode(UserFetchResponsePayload.self) }
-//        }
     }
 }
 
@@ -298,10 +261,6 @@ private struct FreshbooksWebhookResponsePayload: Codable, Content {
 }
 private struct FreshbooksWebhookResponseResponse: Codable, Content {
     let result: FreshbooksWebhookResponseResult
-}
-
-private struct DeleteWebhookRequestPayload: Codable {
-    let id: Int
 }
 
 struct FreshbooksWebhookResponseResult: Codable, Content {

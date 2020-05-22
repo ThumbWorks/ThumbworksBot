@@ -65,14 +65,31 @@ final public  class WebhookController {
         return try self.executeWebhook(on: req).transform(to: .ok)
     }
 
-    func deleteWebhook(_ req: Request) throws -> EventLoopFuture<ClientResponse> {
+    private struct DeleteWebhookRequestPayload: Codable {
+        let id: Int
+    }
+
+    func deleteWebhook(_ req: Request) throws -> EventLoopFuture<HTTPStatus> {
         let user = try req.auth.require(User.self)
-        return user.accountID(on: req).flatMap { accountID in
-            do {
-                return try self.freshbooksService.deleteWebhook(accountID: accountID, on: req)
-            } catch {
-                return req.eventLoop.makeFailedFuture(error)
-            }
+
+        return user.accountID(on: req)
+            .unwrap(or: UserError.noAccountID)
+            .flatMap { accountID in
+                do {
+                    let webhookID = try req.query.decode(DeleteWebhookRequestPayload.self).id
+                    return try self.freshbooksService.deleteWebhook(accountID: accountID, webhookID: webhookID, on: req)
+                        .flatMap({ response in
+                            Webhook.query(on: req.db)
+                                .filter(\.$webhookID, .equal, webhookID)
+                                .first()
+                                .unwrap(or: WebhookError.webhookNotFound)
+                                .flatMap { webhook in
+                                    webhook.delete(on: req.db)
+                            }
+                        }).transform(to: .ok)
+                } catch {
+                    return req.eventLoop.makeFailedFuture(error)
+                }
         }
     }
 
@@ -115,27 +132,28 @@ final public  class WebhookController {
     func registerNewWebhook(_ req: Request) throws -> EventLoopFuture<HTTPStatus> {
         let user = try req.auth.require(User.self)
 
-        return user.accountID(on: req).flatMap { accountID in
-            do {
-                guard let accessToken = req.session.data["accessToken"] else {
-                    throw UserError.noAccessToken
-                }
-
-                let webhookPayload = try self.freshbooksService.registerNewWebhook(accountID: accountID, accessToken: accessToken, on: req)
-                return webhookPayload.flatMap { payload in
-                    do {
-                        let callbackID = payload.response.result.callback.callbackid
-                        let newWebhook = Webhook(webhookID: callbackID, userID: try user.requireID())
-                        return newWebhook.create(on: req.db).map { _ in HTTPStatus.ok }
-                    } catch {
-                        return req.eventLoop.makeFailedFuture(error)
-
+        return user.accountID(on: req)
+            .unwrap(or: UserError.noAccountID)
+            .flatMap { accountID in
+                do {
+                    guard let accessToken = req.session.data["accessToken"] else {
+                        throw UserError.noAccessToken
                     }
-                }
-            } catch {
-                return req.eventLoop.makeFailedFuture(error)
-            }
 
+                    let webhookPayload = try self.freshbooksService.registerNewWebhook(accountID: accountID, accessToken: accessToken, on: req)
+                    return webhookPayload.flatMap { payload in
+                        do {
+                            let callbackID = payload.response.result.callback.callbackid
+                            return Webhook(webhookID: callbackID, userID: try user.requireID())
+                                .save(on: req.db)
+                                .map { _ in HTTPStatus.ok }
+                        } catch {
+                            return req.eventLoop.makeFailedFuture(error)
+                        }
+                    }
+                } catch {
+                    return req.eventLoop.makeFailedFuture(error)
+                }
         }
     }
 
@@ -150,10 +168,17 @@ final public  class WebhookController {
         let accessToken = user.accessToken
         return Business
             .query(on: req.db)
+            .filter(\.$accountID, .notEqual, nil)
             .first()
-            .unwrap(or: Abort(.notFound)).flatMap { business in
+            .unwrap(or: Abort(.notFound))
+            .flatMap { business in
+                guard let accountID = business.accountID else {
+                    return req.eventLoop.makeFailedFuture(Abort(.notFound))
+                }
                 do {
-                    return try self.freshbooksService.fetchWebhooks(accountID: business.accountID, accessToken: accessToken, req: req)
+                    return try self.freshbooksService.fetchWebhooks(accountID: accountID,
+                                                                    accessToken: accessToken,
+                                                                    req: req)
                 } catch {
                     return req.eventLoop.makeFailedFuture(error)
                 }
@@ -173,26 +198,28 @@ extension WebhookController {
                 guard let user = user else {
                     throw WebhookError.orphanedWebhook
                 }
-                return user.accountID(on: req).flatMap { accountID in
-                    do {
-                        let objectID = triggeredPayload.objectID
-                        return try self.getInvoice(accountID: accountID,
-                                                   invoiceID: objectID,
-                                                   accessToken: user.accessToken,
-                                                   on: req)
-                            .flatMap({ invoice in
-                                let text = "New invoice created to \(invoice.currentOrganization), for \(invoice.amount.amount) \(invoice.amount.code)"
-                                let emoji = Emoji(rawValue: invoice.currentOrganization)
-                                do {
-                                    return try self.slackService.sendSlackPayload(text: text, with:emoji, on: req).transform(to: .ok)
-                                }
-                                catch {
-                                    return req.eventLoop.makeFailedFuture(error)
-                                }
-                            })
-                    } catch {
-                        return req.eventLoop.makeFailedFuture(error)
-                    }
+                return user.accountID(on: req)
+                    .unwrap(or: UserError.noAccountID)
+                    .flatMap { accountID in
+                        do {
+                            let objectID = triggeredPayload.objectID
+                            return try self.getInvoice(accountID: accountID,
+                                                       invoiceID: objectID,
+                                                       accessToken: user.accessToken,
+                                                       on: req)
+                                .flatMap({ invoice in
+                                    let text = "New invoice created to \(invoice.currentOrganization), for \(invoice.amount.amount) \(invoice.amount.code)"
+                                    let emoji = Emoji(rawValue: invoice.currentOrganization)
+                                    do {
+                                        return try self.slackService.sendSlackPayload(text: text, with:emoji, on: req).transform(to: .ok)
+                                    }
+                                    catch {
+                                        return req.eventLoop.makeFailedFuture(error)
+                                    }
+                                })
+                        } catch {
+                            return req.eventLoop.makeFailedFuture(error)
+                        }
                 }
             } catch {
                 return req.eventLoop.makeFailedFuture(error)
@@ -203,7 +230,11 @@ extension WebhookController {
     private func verifyWebhook(webhookID: Int, on req: Request) throws ->  EventLoopFuture<HTTPStatus> {
         //        return Webhook.query(on: req.db).filter(\.webhookID == webhookID).first().flatMap { webhook in
         // TODO need to figure out how to filter queries
-        return Webhook.query(on: req.db).first().flatMap { webhook in
+        return Webhook
+            .query(on: req.db)
+            .filter(\.$webhookID, .equal, webhookID)
+            .first()
+            .flatMap { webhook in
             do {
                 guard let webhook = webhook else {
                     throw WebhookError.webhookNotFound
@@ -228,9 +259,10 @@ extension WebhookController {
     }
 }
 extension User {
-    func accountID(on req: Request) -> EventLoopFuture<String> {
+    func accountID(on req: Request) -> EventLoopFuture<String?> {
         return Business // TODO ok we aren't actually creating these
             .query(on: req.db)
+            .filter(\.$accountID, .notEqual, nil)
             .first()
             .unwrap(or: Abort(.notFound)).map { business in
                 return business.accountID
