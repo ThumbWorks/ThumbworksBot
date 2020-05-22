@@ -260,15 +260,12 @@ extension WebhookController {
 }
 extension User {
     func accountID(on req: Request) -> EventLoopFuture<String?> {
-        return Business // TODO ok we aren't actually creating these
+        return Business
             .query(on: req.db)
             .filter(\.$accountID, .notEqual, nil)
             .first()
             .unwrap(or: Abort(.notFound)).map { business in
                 return business.accountID
         }
-//        return businessMemberships.first { membership -> Bool in
-//            return membership.business.accountID != nil
-//            }?.business.accountID
     }
 }

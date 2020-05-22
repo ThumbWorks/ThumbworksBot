@@ -10,8 +10,11 @@ public func configure(_ app: Application) throws {
 
 //public func configure(_ config: inout Config, _ env: inout Environment, _ services: inout Services) throws {
     // Register providers first
-//    app.databases.use(.sqlite(.memory), as: .sqlite)
-    app.databases.use(.sqlite(.file("db.sqlite")), as: .sqlite)
+    if app.environment == .testing {
+        app.databases.use(.sqlite(.memory), as: .sqlite)
+    } else {
+        app.databases.use(.sqlite(.file("db.sqlite")), as: .sqlite)
+    }
     app.migrations.add(CreateUser())
     app.migrations.add(CreateMembership())
     app.migrations.add(CreateBusiness())
@@ -19,7 +22,7 @@ public func configure(_ app: Application) throws {
     app.migrations.add(CreateWebhook())
     app.sessions.use(.fluent(.sqlite))
     app.migrations.add(SessionRecord.migration)
-
+    
     try app.autoMigrate().wait()
     app.views.use(.leaf)
     /// Create default content config

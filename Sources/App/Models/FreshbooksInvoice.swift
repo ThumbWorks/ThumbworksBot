@@ -17,15 +17,16 @@ final class FreshbooksInvoice: Model, Equatable {
         createdAt = Date()
     }
 
+   
     var id: Int?
     var freshbooksID: Int
 //    let id: Int
-    let status: Int
+    var status: Int
     var userID: Int?
-    let paymentStatus: String
-    let currentOrganization: String
-    let amount: Amount
-    let createdAt: Date
+    var paymentStatus: String
+    var currentOrganization: String
+    var amount: Amount
+    var createdAt: Date
 
     struct Amount: Content, Equatable {
         let amount: String
