@@ -9,18 +9,41 @@ final class FreshbooksInvoice: Model, Equatable {
     static var schema: String = "https://" // TODO upgrade to v4
 
     required init() {
-        freshbooksID = 1
-        status = 1
-        paymentStatus = "TODO"
-        currentOrganization = "TODO"
-        amount = Amount(amount: "TODO", code: "TODO")
-        createdAt = Date()
     }
 
-   
+   @ID(key: .id)
+    var id: UUID?
+
+    @Field(key: "freshbooksID")
+    var freshbooksID: Int
+
+    @Field(key: "status")
+    var status: Int
+
+    @Field(key: "status")
+    var userID: Int?
+
+    @Field(key: "status")
+    var paymentStatus: String
+
+    @Field(key: "status")
+    var currentOrganization: String
+
+    @Field(key: "status")
+    var amount: Amount
+
+    @Field(key: "status")
+    var createdAt: Date
+
+    struct Amount: Content, Equatable {
+        let amount: String
+        let code: String
+    }
+}
+
+struct FreshbooksInvoiceContent: Content, Equatable {
     var id: Int?
     var freshbooksID: Int
-//    let id: Int
     var status: Int
     var userID: Int?
     var paymentStatus: String
@@ -41,12 +64,3 @@ final class FreshbooksInvoice: Model, Equatable {
         case currentOrganization = "current_organization"
     }
 }
-
-/// Allows `Todo` to be used as a dynamic migration.
-//extension FreshbooksInvoice: Migration { } // TODO upgrade to v4
-
-/// Allows `Todo` to be encoded to and decoded from HTTP messages.
-extension FreshbooksInvoice: Content { } // TODO upgrade to v4
-
-/// Allows `Todo` to be used as a dynamic parameter in route definitions.
-//extension FreshbooksInvoice: Parameter { } // TODO upgrade to v4

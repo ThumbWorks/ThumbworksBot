@@ -39,7 +39,7 @@ protocol FreshbooksWebServicing {
     func deleteWebhook(accountID: String, webhookID: Int, on req: Request) throws -> EventLoopFuture<ClientResponse>
     func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<NewWebhookPayload>
     func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult>
-    func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoice>
+    func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent>
     func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserFetchResponsePayload>
 //    func allInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]>
     func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse>
@@ -121,7 +121,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
 //        }
 //    }
 
-    func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoice> {
+    func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent> {
         let url = URI.freshbooksInvoiceURL(accountID: accountID, invoiceID: invoiceID)
         let client = req.client
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
@@ -288,7 +288,7 @@ struct InvoicePackage: Content {
     struct InvoiceResponse: Content {
         let result: InvoiceContainer
         struct InvoiceContainer: Content {
-            let invoice: FreshbooksInvoice
+            let invoice: FreshbooksInvoiceContent
         }
     }
 

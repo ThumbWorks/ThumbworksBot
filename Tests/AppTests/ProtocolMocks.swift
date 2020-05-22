@@ -29,6 +29,10 @@ class SlackWebServicingMock: SlackWebServicing {
 }
 
 class FreshbooksWebServicingMock: FreshbooksWebServicing {
+//    func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoice> {
+//
+//    }
+
     init() { }
 
 
@@ -63,8 +67,8 @@ class FreshbooksWebServicingMock: FreshbooksWebServicing {
     }
 
     var fetchInvoiceCallCount = 0
-    var fetchInvoiceHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<FreshbooksInvoice>))?
-    func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoice> {
+    var fetchInvoiceHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<FreshbooksInvoiceContent>))?
+    func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent> {
         fetchInvoiceCallCount += 1
         if let fetchInvoiceHandler = fetchInvoiceHandler {
             return try fetchInvoiceHandler(accountID, invoiceID, accessToken, req)

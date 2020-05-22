@@ -29,12 +29,12 @@ class WebhookControllerTests: XCTestCase {
     var application: Application! = nil
 
     var testUser: User?
-    static let invoice = FreshbooksInvoice(freshbooksID: 1,
-                                           status: 2,
-                                           paymentStatus: "unpaid",
-                                           currentOrganization: Emoji.uber.rawValue,
-                                           amount: FreshbooksInvoice.Amount(amount: "123", code: "USD"),
-                                           createdAt: Date())
+    static let invoice = FreshbooksInvoiceContent(freshbooksID: 1,
+                                                  status: 2,
+                                                  paymentStatus: "unpaid",
+                                                  currentOrganization: Emoji.uber.rawValue,
+                                                  amount: FreshbooksInvoiceContent.Amount(amount: "123", code: "USD"),
+                                                  createdAt: Date())
     let business = BusinessPayload(id: 345, name: "Thumbworks", accountID: "businessAccountID")
     lazy var membership = MembershipPayload(id: 123, role: "manager", business: business)
     lazy var userResponseObject = UserResponseObject(id: 123, firstName: "rod", lastName: "campbell", businessMemberships: [membership])
@@ -55,8 +55,8 @@ class WebhookControllerTests: XCTestCase {
     let userAccessToken = "accessTokenOfUserSavedInDB"
     lazy var controller = WebhookController(hostName: "localhost", slackService: slack, freshbooksService: freshbooks)
     
-    var fetchInvoiceHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<FreshbooksInvoice>))? = { a, b, c, request in
-        let promise = request.eventLoop.makePromise(of: FreshbooksInvoice.self)
+    var fetchInvoiceHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<FreshbooksInvoiceContent>))? = { a, b, c, request in
+        let promise = request.eventLoop.makePromise(of: FreshbooksInvoiceContent.self)
         DispatchQueue.global().async {
             let date = Date(timeIntervalSince1970: 123)
             promise.succeed(WebhookControllerTests.invoice)
@@ -114,6 +114,8 @@ class WebhookControllerTests: XCTestCase {
         XCTAssertEqual(expectedSlackPayloadString, "New invoice created to Uber Technologies, Inc, for 123 USD")
         
         XCTAssertEqual(slack.sendSlackPayloadCallCount, 1)
+        XCTAssertEqual(freshbooks.fetchInvoiceCallCount, 1)
+
     }
     
     func testFreshbooksVerificationWebhook() throws {
@@ -141,6 +143,8 @@ class WebhookControllerTests: XCTestCase {
             print(error)
             XCTFail(error.localizedDescription)
         }
+        XCTAssertEqual(freshbooks.confirmWebhookCallCount, 1)
+
     }
     
     func testFetchInvoice() throws {
@@ -152,7 +156,7 @@ class WebhookControllerTests: XCTestCase {
         do {
             // fetch the invoice
             let invoice = try controller.getInvoice(accountID: accountID, invoiceID: invoiceID, accessToken: accessToken, on: req)
-                .map({ invoice -> FreshbooksInvoice in
+                .map({ invoice in
                     return invoice
                 }).wait()
             // verify that it's what we planned to send back
@@ -160,6 +164,8 @@ class WebhookControllerTests: XCTestCase {
         } catch {
             XCTFail(error.localizedDescription)
         }
+        XCTAssertEqual(freshbooks.fetchInvoiceCallCount, 1)
+
     }
 
     func testDeleteWebhook() throws {
@@ -170,14 +176,28 @@ class WebhookControllerTests: XCTestCase {
             XCTAssertEqual(self.business.accountID, userID)
             return request.successPromiseAfterGlobalDispatchASync()
         }
-
         _ = try UserSessionAuthenticator().authenticate(sessionID: userAccessToken, for: req).wait()
+        try req.query.encode(TestingDeleteWebhookRequestPayload(id: 123))
 
-        // delete the invoice
-        _ = try controller.deleteWebhook(req).wait()
+        // Ensure that the webhook exists before we attempt to delete it
+        XCTAssertEqual(try Webhook.query(on: req.db).all().wait().count, 1)
+
+        do {
+            // Delete the webhook
+            _ = try controller.deleteWebhook(req).wait()
+
+            // Ensure that the webhook is out of the database
+            XCTAssertEqual(try Webhook.query(on: req.db).all().wait().count, 0)
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+
+        XCTAssertEqual(freshbooks.deleteWebhookCallCount, 1)
     }
 }
-
+private struct TestingDeleteWebhookRequestPayload: Codable {
+    let id: Int
+}
 extension Request {
     fileprivate func successPromiseAfterGlobalDispatchASync() -> EventLoopFuture<ClientResponse> {
         let promise = eventLoop.makePromise(of: ClientResponse.self)
