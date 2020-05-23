@@ -93,37 +93,52 @@ final public  class WebhookController {
         }
     }
 
-//    func getInvoices(_ req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]> {
-//        let user = try req.auth.require(User.self)
-//        guard let accountID = user.accountID() else {
-//            throw UserError.noAccountID
-//        }
-//        guard let accessToken = req.session.data["accessToken"] else {
-//            throw UserError.noAccessToken
-//        }
-//        return FreshbooksInvoice.query(on: req.db).all().flatMapThrowing({ (invoices) in
-//            print("totalInvoices \(invoices.count)")
-//            let total = invoices.reduce(0.0, { x, invoiceAmount in
-//                guard let amount = Double(invoiceAmount.amount.amount) else {
-//                    return 0
-//                }
-//                return x + amount
-//            })
-//            print(total)
-//            return try self.freshbooksService
-//                .allInvoices(accountID: accountID, accessToken: accessToken, page: 1, on: req)
-//                .do({ invoices in
-//                    
-//                    let total = invoices.reduce(0.0, { x, invoice in
-//                        guard let amount = Double(invoice.amount.amount) else {
-//                            return 0
-//                        }
-//                        return x + amount
-//                    })
-//                    print(total)
-//            })
-//        })
-//    }
+    private func recursiveFetchInvoices(page: Int, accountID: String, accessToken: String, onIncremental: @escaping ([FreshbooksInvoiceContent]) -> (), on req: Request) throws -> EventLoopFuture<[FreshbooksInvoiceContent]>  {
+        return try self.freshbooksService
+            .fetchInvoices(accountID: accountID, accessToken: accessToken, page: page, on: req).flatMap { metaData in
+                let theseInvoices = req.eventLoop.makeSucceededFuture(metaData.invoices)
+                theseInvoices.whenSuccess { onIncremental($0) }
+                do {
+                    if metaData.pages > page {
+                        return try self.recursiveFetchInvoices(page: page + 1, accountID: accountID, accessToken: accessToken, onIncremental: onIncremental, on: req)
+                    }
+                    return theseInvoices
+                }  catch {
+                    return req.eventLoop.makeFailedFuture(error)
+                }
+        }
+    }
+    
+    func getInvoices(_ req: Request) throws -> EventLoopFuture<HTTPStatus> {
+        let user = try req.auth.require(User.self)
+        return user.accountID(on: req)
+            .unwrap(or: UserError.noAccountID)
+            .flatMap { accountID in
+                do {
+                    guard let accessToken = req.session.data["accessToken"] else {
+                        throw UserError.noAccessToken
+                    }
+
+                    let saveIncrementalsClosure: ([FreshbooksInvoiceContent]) -> () = { invoiceContents in
+                        invoiceContents.forEach { content in
+                            print("saving \(content.freshbooksID) from \(content.createdAt)")
+                            let invoice = content.invoice()
+                            _ = invoice.save(on: req.db)
+                        }
+                    }
+                    let recursiveResults = try self.recursiveFetchInvoices(page: 1,
+                                                                           accountID: accountID,
+                                                                           accessToken: accessToken,
+                                                                           onIncremental: saveIncrementalsClosure,
+                                                                           on: req)
+                    return recursiveResults
+                        .transform(to: HTTPStatus.ok)
+                } catch {
+                    return req.eventLoop.makeFailedFuture(error)
+                }
+        }
+    }
+
 
     func getInvoice(accountID: String, invoiceID: Int, accessToken: String, on req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent> {
         return try freshbooksService.fetchInvoice(accountID: accountID, invoiceID: invoiceID, accessToken: accessToken, req: req)

@@ -13,8 +13,8 @@ enum TestingError: Error {
     case slackFail
 }
 
-extension FreshbooksInvoice {
-    convenience init(freshbooksID: Int, status: Int, paymentStatus: String, currentOrganization: String, amount: FreshbooksInvoice.Amount, createdAt: Date) {
+extension Invoice {
+    convenience init(freshbooksID: Int, status: Int, paymentStatus: String, currentOrganization: String, amount: Invoice.Amount, createdAt: Date) {
         self.init()
         self.freshbooksID = freshbooksID
         self.status = status

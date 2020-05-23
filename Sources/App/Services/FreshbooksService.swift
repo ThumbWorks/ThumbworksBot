@@ -41,7 +41,7 @@ protocol FreshbooksWebServicing {
     func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult>
     func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent>
     func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserFetchResponsePayload>
-//    func allInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]>
+    func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent>
     func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse>
     func auth(with code: String, on req: Request) throws -> EventLoopFuture<TokenExchangeResponse>
 }
@@ -85,41 +85,19 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
     }
 
     // An attempt was made to add this call with a job
-//    func allInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<[FreshbooksInvoice]> {
-//
-//        let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-//        let client = req.client
-//        return client.get(URI.freshbooksInvoicesURL(accountID: accountID, page: page), headers: provider.headers())
-//            .flatMapThrowing { clientResponse in
-//                let invoicesPackage = try clientResponse.content.decode(InvoicesPackage.self)
-//                let thisPageInvoices = invoicesPackage.response.result.invoices.compactMap { invoice -> EventLoopFuture<FreshbooksInvoice> in
-//                    print(invoice.amount.amount)
-//                    let savedInvoice =  invoice.save(on: req)
-//                    return savedInvoice
-//                }
-//                let result = invoicesPackage.response.result
-//                if result.page < result.pages {
-//                    _ = try self.allInvoices(accountID: accountID, accessToken: accessToken, page: result.page + 1, on: req)
-//                }
-//                return thisPageInvoices
-//        })
+    func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent> {
 
-//        return client.get(URI.freshbooksInvoicesURL(accountID: accountID, page: page), beforeSend: provider.headers()).flatMap { response in
-//
-//            return try response.content.decode(InvoicesPackage.self).flatMap({ invoicesPackage  in
-//                let thisPageInvoices = invoicesPackage.response.result.invoices.compactMap { invoice -> EventLoopFuture<FreshbooksInvoice> in
-//                    print(invoice.amount.amount)
-//                    let savedInvoice =  invoice.save(on: req)
-//                    return savedInvoice
-//                }.flatten(on: req)
-//                let result = invoicesPackage.response.result
-//                if result.page < result.pages {
-//                    _ = try self.allInvoices(accountID: accountID, accessToken: accessToken, page: result.page + 1, on: req)
-//                }
-//                return thisPageInvoices
-//            })
-//        }
-//    }
+        let provider = FreshbooksHeaderProvider(accessToken: accessToken)
+        let client = req.client
+        let url = URI.freshbooksInvoicesURL(accountID: accountID, page: page)
+        print(url)
+        return client.get(url, headers: provider.headers())
+            .flatMapThrowing { clientResponse in
+                let result = try clientResponse.content.decode(InvoicesPackage.self).response.result
+                result.invoices.forEach {print($0.createdAt)}
+                return try clientResponse.content.decode(InvoicesPackage.self).response.result
+        }
+    }
 
     func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent> {
         let url = URI.freshbooksInvoiceURL(accountID: accountID, invoiceID: invoiceID)
@@ -297,13 +275,14 @@ struct InvoicesPackage: Content {
     let response: InvoicesResult
 
     struct InvoicesResult: Content {
-        let result: Invoices
-        struct Invoices: Content {
-            let pages: Int
-            let page: Int
-            let invoices: [FreshbooksInvoice]
-        }
+        let result: InvoicesMetaDataContent
+
     }
+}
+struct InvoicesMetaDataContent: Content {
+    let pages: Int
+    let page: Int
+    let invoices: [FreshbooksInvoiceContent]
 }
 
 struct TokenExchangeResponse: Content {

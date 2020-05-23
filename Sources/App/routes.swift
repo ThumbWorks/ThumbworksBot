@@ -62,6 +62,6 @@ public func routes(_ app: Application) throws {
     protected.get("allWebhooks", use: webhookController.allWebhooks)
     protected.post("webhooks", "new", use: webhookController.registerNewWebhook)
     protected.get("webhooks", "delete", use: webhookController.deleteWebhook)
-//    session.get("/invoices/", use: webhookController.getInvoices)
+    protected.get("invoices", use: webhookController.getInvoices)
 }
 
