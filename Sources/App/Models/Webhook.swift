@@ -34,7 +34,7 @@ final class Webhook: Model, Codable {
 
 struct CreateWebhook: Migration {
     func prepare(on database: Database) -> EventLoopFuture<Void> {
-        database.schema("webhooks")
+        database.schema(Webhook.schema)
                   .id()
                   .field("webhookID", .int)
                   .field("userID", .uuid)
@@ -43,6 +43,6 @@ struct CreateWebhook: Migration {
     }
 
     func revert(on database: Database) -> EventLoopFuture<Void> {
-        database.schema("webhooks").delete()
+        database.schema(Webhook.schema).delete()
     }
 }

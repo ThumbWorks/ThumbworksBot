@@ -36,7 +36,7 @@ final class Business: Model {
 
 struct CreateBusiness: Migration {
     func prepare(on database: Database) -> EventLoopFuture<Void> {
-        database.schema("businesses")
+        database.schema(Business.schema)
             .id()
             .field("name", .string)
             .field("accountID", .string)
@@ -46,6 +46,6 @@ struct CreateBusiness: Migration {
     }
 
     func revert(on database: Database) -> EventLoopFuture<Void> {
-        database.schema("businesses").delete()
+        database.schema(Business.schema).delete()
     }
 }

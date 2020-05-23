@@ -36,7 +36,7 @@ final class MembershipBusiness: Model {
 
 struct CreateMembershipBusiness: Migration {
     func prepare(on database: Database) -> EventLoopFuture<Void> {
-        database.schema("membershipbusiness")
+        database.schema(MembershipBusiness.schema)
                    .id()
             .field("business_id", .uuid, .required, .references("businesss", "id"))
             .field("membership_id", .uuid, .required, .references("memberships", "id"))
@@ -44,6 +44,6 @@ struct CreateMembershipBusiness: Migration {
     }
 
     func revert(on database: Database) -> EventLoopFuture<Void> {
-                database.schema("membershipbusiness").delete()
+        database.schema(MembershipBusiness.schema).delete()
     }
 }

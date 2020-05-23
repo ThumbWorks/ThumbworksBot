@@ -85,7 +85,7 @@ struct UserSessionAuthenticator: SessionAuthenticator {
 /// Allows `User` to be used as a dynamic migration.
 struct CreateUser: Migration {
     func prepare(on database: Database) -> EventLoopFuture<Void> {
-        database.schema("users")
+        database.schema(User.schema)
             .id()
             .field("accessToken", .string)
             .field("freshbooksID", .int64)
@@ -96,7 +96,7 @@ struct CreateUser: Migration {
     }
 
     func revert(on database: Database) -> EventLoopFuture<Void> {
-            database.schema("users").delete()
+            database.schema(User.schema).delete()
     }
 }
 
