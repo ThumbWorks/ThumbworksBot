@@ -29,10 +29,6 @@ class SlackWebServicingMock: SlackWebServicing {
 }
 
 class FreshbooksWebServicingMock: FreshbooksWebServicing {
-//    func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoice> {
-//
-//    }
-
     init() { }
 
 
@@ -84,6 +80,16 @@ class FreshbooksWebServicingMock: FreshbooksWebServicing {
             return try fetchUserHandler(accessToken, req)
         }
         fatalError("fetchUserHandler returns can't have a default value thus its handler must be set")
+    }
+
+    var fetchInvoicesCallCount = 0
+    var fetchInvoicesHandler: ((String, String, Int, Request) throws -> (EventLoopFuture<InvoicesMetaDataContent>))?
+    func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent> {
+        fetchInvoicesCallCount += 1
+        if let fetchInvoicesHandler = fetchInvoicesHandler {
+            return try fetchInvoicesHandler(accountID, accessToken, page, req)
+        }
+        fatalError("fetchInvoicesHandler returns can't have a default value thus its handler must be set")
     }
 
     var confirmWebhookCallCount = 0
