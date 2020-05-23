@@ -7,7 +7,7 @@
 
 import Vapor
 
-enum Emoji: String {
+public enum Emoji: String {
     case uber = "Uber Technologies, Inc"
     case lohi = "Lohi Labs"
     case apple
@@ -26,20 +26,20 @@ enum Emoji: String {
     }
 }
 /// @mockable
-protocol SlackWebServicing {
+public protocol SlackWebServicing {
     func sendSlackPayload(text: String, with emoji: Emoji?, on req: Request) throws -> EventLoopFuture<ClientResponse>
     var req: Request? { get set }
 }
 
-final class SlackWebService: SlackWebServicing {
+public final class SlackWebService: SlackWebServicing {
     let slackURL: URI
-    var req: Request?
+    public var req: Request? // todo maybe i can get rid of this
 
-    init(slackURL: URI) {
+    public init(slackURL: URI) {
         self.slackURL = slackURL
     }
 
-    func sendSlackPayload(text: String, with emoji: Emoji?, on req: Request) throws -> EventLoopFuture<ClientResponse> {
+    public func sendSlackPayload(text: String, with emoji: Emoji?, on req: Request) throws -> EventLoopFuture<ClientResponse> {
         return req.client.post(self.slackURL) { request in
             try request.content.encode(SlackWebhookRequestPayload(text: text, iconEmoji: emoji?.symbol))
         }.map { $0 }

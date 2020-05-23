@@ -9,8 +9,11 @@ final class AppTests: XCTestCase {
     lazy var webhookController = WebhookController(hostName: "localhost", slackService: slack, freshbooksService: freshbooks)
 
     override func setUp() {
-           application = Application(Environment.testing)
-           try? configure(application)
+        application = Application(Environment.testing)
+        freshbooks.authHandler = TestData.freshbooksAuthHandler
+        freshbooks.fetchUserHandler = TestData.fetchUserHandler
+        let deps = ApplicationDependencies(freshbooksServicing: freshbooks, slackServicing: slack, hostname: "", clientID: "'")
+        try? configure(application, dependencies: deps)
     }
 
     func testFetchInvoice() throws {
@@ -31,5 +34,27 @@ final class AppTests: XCTestCase {
             XCTFail(error.localizedDescription)
         }
         XCTAssertEqual(freshbooks.fetchInvoiceCallCount, 1)
+    }
+
+    func testAuthBadRequest() throws {
+        try application.test(.GET, "freshbooks/auth") { res in
+            XCTAssertEqual(res.status, .badRequest)
+        }
+    }
+
+    func testOAuthGetToken() throws {
+        // When the user attempts the auth call with an auth request code
+        try application.test(.GET, "freshbooks/auth", beforeRequest: { request in
+            try request.query.encode(TestData.authRequest)
+        }) { res in
+            // Auth call to freshbooks happens
+            XCTAssertEqual(freshbooks.authCallCount, 1)
+
+            // Fetch user from freshbooks
+            XCTAssertEqual(freshbooks.fetchUserCallCount, 1)
+
+            // Return status should be .ok
+            XCTAssertEqual(res.status, .ok)
+        }
     }
 }

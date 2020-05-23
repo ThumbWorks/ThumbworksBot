@@ -35,7 +35,7 @@ extension URI {
 }
 
 /// @mockable
-protocol FreshbooksWebServicing {
+public protocol FreshbooksWebServicing {
     func deleteWebhook(accountID: String, webhookID: Int, on req: Request) throws -> EventLoopFuture<ClientResponse>
     func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<NewWebhookPayload>
     func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult>
@@ -72,20 +72,20 @@ class FreshbooksHeaderProvider {
 //    }
 }
 
-final class FreshbooksWebservice: FreshbooksWebServicing {
+public final class FreshbooksWebservice: FreshbooksWebServicing {
 
     let clientSecret: String
     let clientID: String
     let hostname: String
 
-    init(hostname: String, clientID: String, clientSecret: String) {
+    public init(hostname: String, clientID: String, clientSecret: String) {
         self.hostname = hostname
         self.clientID = clientID
         self.clientSecret = clientSecret
     }
 
     // An attempt was made to add this call with a job
-    func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent> {
+    public func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent> {
 
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
         let client = req.client
@@ -99,7 +99,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         }
     }
 
-    func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent> {
+    public func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent> {
         let url = URI.freshbooksInvoiceURL(accountID: accountID, invoiceID: invoiceID)
         let client = req.client
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
@@ -110,7 +110,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         }
     }
 
-    func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse> {
+    public func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse> {
         let client = req.client
         let payload = try req.content.decode(FreshbooksWebhookTriggeredContent.self)
         let url = URI.freshbooksCallbackURL(accountID: payload.accountID, objectID: payload.objectID)
@@ -127,7 +127,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         }
     }
 
-    func deleteWebhook(accountID: String, webhookID: Int, on req: Request) throws -> EventLoopFuture<ClientResponse> {
+    public func deleteWebhook(accountID: String, webhookID: Int, on req: Request) throws -> EventLoopFuture<ClientResponse> {
         let client = req.client
         guard let accessToken = req.session.data["accessToken"] else {
             throw UserError.noAccessToken
@@ -137,7 +137,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         return client.delete(url, headers: provider.headers())
     }
 
-    func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<NewWebhookPayload> {
+    public func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<NewWebhookPayload> {
         let callback = NewWebhookCallbackRequest(event: "invoice.create", uri: "\(hostname)/webhooks/ready")
         let requestPayload = CreateWebhookRequestPayload(callback: callback)
         let url = URI.freshbooksCallbacksURL(accountID: accountID)
@@ -152,7 +152,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         }
     }
 
-    func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult> {
+    public func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult> {
         let url = URI.freshbooksCallbacksURL(accountID: accountID)
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
 
@@ -162,7 +162,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         }
     }
 
-    func auth(with code: String, on req: Request) throws -> EventLoopFuture<TokenExchangeResponse> {
+    public func auth(with code: String, on req: Request) throws -> EventLoopFuture<TokenExchangeResponse> {
         return try exchangeToken(with: code, on: req)
     }
 
@@ -179,7 +179,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
         }
     }
 
-    func fetchUser(accessToken: String, on req: Request)  throws ->  EventLoopFuture<UserFetchResponsePayload> {
+    public func fetchUser(accessToken: String, on req: Request)  throws ->  EventLoopFuture<UserFetchResponsePayload> {
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
 
         let userEndpoint = URI.freshbooksUser
@@ -190,7 +190,7 @@ final class FreshbooksWebservice: FreshbooksWebServicing {
     }
 }
 
-struct NewWebhookPayload: Content {
+public struct NewWebhookPayload: Content {
     let response: NewWebhookPayloadResponse
     struct NewWebhookPayloadResponse: Content {
         let result: NewWebhookPayloadResult
@@ -241,7 +241,7 @@ private struct FreshbooksWebhookResponseResponse: Codable, Content {
     let result: FreshbooksWebhookResponseResult
 }
 
-struct FreshbooksWebhookResponseResult: Codable, Content {
+public struct FreshbooksWebhookResponseResult: Codable, Content {
     let perPage: Int
     let pages: Int
     let page: Int
@@ -279,13 +279,13 @@ struct InvoicesPackage: Content {
 
     }
 }
-struct InvoicesMetaDataContent: Content {
+public struct InvoicesMetaDataContent: Content {
     let pages: Int
     let page: Int
     let invoices: [FreshbooksInvoiceContent]
 }
 
-struct TokenExchangeResponse: Content {
+public struct TokenExchangeResponse: Content {
     let accessToken: String
     let tokenType: String
     let expiresIn: Int

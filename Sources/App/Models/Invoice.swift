@@ -60,7 +60,7 @@ struct CreateInvoice: Migration {
            database.schema(Invoice.schema).delete()
        }
 }
-struct FreshbooksInvoiceContent: Content, Equatable {
+public struct FreshbooksInvoiceContent: Content, Equatable {
     var freshbooksID: Int
     var status: Int
     var userID: Int?

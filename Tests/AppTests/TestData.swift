@@ -40,6 +40,26 @@ struct TestData {
         }
         return promise.futureResult
     }
+
+    static let tokenExchangeResponse = TokenExchangeResponse(accessToken: "", tokenType: "", expiresIn: 0, refreshToken: "", scope: "", createdAt: 0)
+    static let userFetchResponsePayload = UserFetchResponsePayload(response: UserResponseObject(id: 0, firstName: "", lastName: "", businessMemberships: []))
+    static let fetchUserHandler: ((String, Request) throws -> (EventLoopFuture<UserFetchResponsePayload>))? = { string, request in
+        let promise = request.eventLoop.makePromise(of: UserFetchResponsePayload.self)
+              DispatchQueue.global().async {
+                  promise.succeed(TestData.userFetchResponsePayload)
+              }
+              return promise.futureResult
+    }
+
+    static let freshbooksAuthHandler: ((String, Request) throws -> (EventLoopFuture<TokenExchangeResponse>))? = { string, request in
+        let promise = request.eventLoop.makePromise(of: TokenExchangeResponse.self)
+        DispatchQueue.global().async {
+            promise.succeed(TestData.tokenExchangeResponse)
+        }
+        return promise.futureResult
+    }
+
+    static let authRequest = AuthRequest(code: "dummyCode")
 }
 
 struct TestingDeleteWebhookRequestPayload: Codable {

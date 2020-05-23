@@ -34,7 +34,8 @@ final class FreshbooksController {
 
     func freshbooksAuth(_ req: Request) throws -> EventLoopFuture<View> {
         let codeContainer = try req.query.decode(AuthRequest.self)
-        return try freshbooksService.auth(with: codeContainer.code, on: req).flatMap({ (tokenResponse) -> EventLoopFuture<View> in
+        return try freshbooksService.auth(with: codeContainer.code, on: req)
+            .flatMap({ (tokenResponse) -> EventLoopFuture<View> in
             req.session.data["accessToken"] = tokenResponse.accessToken
             do {
                 return try self.freshbooksService
@@ -79,7 +80,7 @@ struct UserFetchRequest: Content {
     }
 }
 
-struct UserFetchResponsePayload: Content {
+public struct UserFetchResponsePayload: Content {
     let response: UserResponseObject
 }
 

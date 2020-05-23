@@ -6,7 +6,7 @@ import Fluent
 //import Jobs
 
 /// Called before your application initializes.
-public func configure(_ app: Application) throws {
+public func configure(_ app: Application, dependencies: ApplicationDependencies) throws {
 
 //public func configure(_ config: inout Config, _ env: inout Environment, _ services: inout Services) throws {
     // Register providers first
@@ -43,8 +43,6 @@ public func configure(_ app: Application) throws {
 
     app.middleware.use(ErrorMiddleware.default(environment: app.environment))
     app.middleware.use(app.sessions.middleware)
-
-
-    try routes(app)  
+    try routes(app, dependencies: dependencies)
 
 }

@@ -1,44 +1,35 @@
 import Vapor
 
-enum RouterError: Error {
+public enum RouterError: Error {
     case missingClientID
     case missingClientSecret
     case missingSlackURL
 }
+
+public struct ApplicationDependencies {
+    let freshbooksServicing: FreshbooksWebServicing
+    let slackServicing: SlackWebServicing
+    let hostname: String
+    let clientID: String
+
+    public init(freshbooksServicing: FreshbooksWebServicing, slackServicing: SlackWebServicing, hostname: String, clientID: String) {
+        self.freshbooksServicing = freshbooksServicing
+        self.slackServicing = slackServicing
+        self.hostname = hostname
+        self.clientID = clientID
+    }
+}
 /// Register your application's routes here.
-public func routes(_ app: Application) throws {
+public func routes(_ app: Application, dependencies: ApplicationDependencies) throws {
 
-
-    
-//    let job = EmailJobContext(to: "to@to.com", from: "from@from.com", message: "message")
-//    return queue.dispatch(job: job).transform(to: .ok)
-    let hostname = "https://thumbworksbot.ngrok.io"
-    guard let clientID = Environment.get("thumbworksbot_app_freshbooks_client_id") else {
-        throw RouterError.missingClientID
-    }
-    guard let clientSecret = Environment.get("thumbworksbot_app_freshbooks_secret") else {
-        throw RouterError.missingClientSecret
-    }
-    guard let slackURIString = Environment.get("thumbworksbot_app_freshbooks_slack_message_url") else {
-        throw RouterError.missingSlackURL
-    }
-
-    let slackMessageURL = URI(string: slackURIString)
-
-
-
-    let slack = SlackWebService(slackURL: slackMessageURL)
-    let freshbookService = FreshbooksWebservice(hostname: hostname,
-                                                clientID: clientID,
-                                                clientSecret: clientSecret)
-    let freshbooksController = FreshbooksController(freshbooksService: freshbookService, app: app)
-    let webhookController = WebhookController(hostName: hostname,
-                                              slackService: slack,
-                                              freshbooksService: freshbookService)
+    let freshbooksController = FreshbooksController(freshbooksService: dependencies.freshbooksServicing, app: app)
+    let webhookController = WebhookController(hostName: dependencies.hostname,
+                                              slackService: dependencies.slackServicing,
+                                              freshbooksService: dependencies.freshbooksServicing)
 
     // The logged out view linking to the oauth flow
     app.get { req in
-        return req.view.render("Landing", ["client_id" : clientID])
+        return req.view.render("Landing", ["client_id" : dependencies.clientID])
     }
 
     app.post("webhooks", use: freshbooksController.webhook)
