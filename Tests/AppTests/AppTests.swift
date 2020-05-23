@@ -57,4 +57,13 @@ final class AppTests: XCTestCase {
             XCTAssertEqual(res.status, .ok)
         }
     }
+
+    func testCreateWebhookWhileLoggedOut() throws {
+        // When the user attempts the auth call with an auth request code
+        try application.test(.POST, "webhooks/new") { res in
+            // Should be unauthorized
+            XCTAssertEqual(res.status, .unauthorized)
+        }
+    }
+
 }
