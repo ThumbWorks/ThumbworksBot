@@ -48,8 +48,6 @@ public protocol FreshbooksWebServicing {
 
 class FreshbooksHeaderProvider {
     let accessToken: String
-    let response: Response?
-
     func headers() -> HTTPHeaders {
         var headers = HTTPHeaders()
         headers.add(name: .accept, value: "application/json")
@@ -57,9 +55,8 @@ class FreshbooksHeaderProvider {
         headers.add(name: .authorization, value: "Bearer \(accessToken)")
         return headers
     }
-    init(accessToken: String, bodyContent: Response? = nil) {
+    init(accessToken: String) {
         self.accessToken = accessToken
-        self.response = bodyContent
     }
 //    func setHeaders(request: Request) throws -> () {
 //        if let response = response?.http.body {
@@ -118,13 +115,10 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
             throw FreshbooksError.noVerifierAttribute
         }
         let callback = FreshbooksCallback(callbackID: payload.objectID, verifier: verifier)
-        let confirmedReadyPayload = FreshbookConfirmReadyPayload(callback: callback)
-            .encodeResponse(for: req)
-
-        return confirmedReadyPayload.flatMap { confirmedReadyPayload  in
-            let provider = FreshbooksHeaderProvider(accessToken: accessToken, bodyContent: confirmedReadyPayload)
-            return client.put(url, headers: provider.headers())
-        }
+        let provider = FreshbooksHeaderProvider(accessToken: accessToken)
+        return client.put(url, headers: provider.headers(), beforeSend: { request in
+            try request.content.encode(FreshbookConfirmReadyPayload(callback: callback))
+        })
     }
 
     public func deleteWebhook(accountID: String, webhookID: Int, on req: Request) throws -> EventLoopFuture<ClientResponse> {

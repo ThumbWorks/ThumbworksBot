@@ -108,7 +108,7 @@ final public  class WebhookController {
                 }
         }
     }
-    
+
     func getInvoices(_ req: Request) throws -> EventLoopFuture<HTTPStatus> {
         let user = try req.auth.require(User.self)
         return user.accountID(on: req)
@@ -279,7 +279,7 @@ extension User {
             .query(on: req.db)
             .filter(\.$accountID, .notEqual, nil)
             .first()
-            .unwrap(or: Abort(.notFound)).map { business in
+            .unwrap(or: Abort.redirect(to: "/")).map { business in
                 return business.accountID
         }
     }
