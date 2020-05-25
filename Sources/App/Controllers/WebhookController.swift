@@ -54,10 +54,6 @@ final public  class WebhookController {
     // The webhook payload looks like this:
     // http://your_server.com/webhooks/ready?name=invoice.create&object_id=1234567&account_id=6BApk&user_id=1
     public func ready(_ req: Request) throws ->  EventLoopFuture<HTTPStatus> {
-//        return req.client.post(self.slackURL) { request in
-//                  try request.content.encode(SlackWebhookRequestPayload(text: text, iconEmoji: emoji?.symbol))
-//              }.map { $0 }
-
         let triggeredPayload = try req.content.decode(FreshbooksWebhookTriggeredContent.self)
         if let _  = triggeredPayload.verifier {
             return try self.verifyWebhook(webhookID: triggeredPayload.objectID, on: req).transform(to: .ok)
@@ -207,7 +203,6 @@ extension WebhookController {
         let triggeredPayload = try req.content.decode(FreshbooksWebhookTriggeredContent.self)
         return User.query(on: req.db).all().flatMap { allUsers in
             let user = allUsers.first
-//        }
             //        return User.find(triggeredPayload.freshbooksUserID, on: req.db).flatMap { user in
             do {
                 guard let user = user else {
@@ -279,7 +274,7 @@ extension User {
             .query(on: req.db)
             .filter(\.$accountID, .notEqual, nil)
             .first()
-            .unwrap(or: Abort.redirect(to: "/")).map { business in
+            .unwrap(or: Abort(.notFound)).map { business in
                 return business.accountID
         }
     }

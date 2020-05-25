@@ -33,7 +33,7 @@ struct TestData {
                                                                            accountID: "123")
     static let userAccessToken = "accessTokenOfUserSavedInDB"
 
-    static let fetchInvoiceHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<FreshbooksInvoiceContent>))? = { a, b, c, request in
+    static let fetchInvoiceHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<FreshbooksInvoiceContent>))? = { _, _, _, request in
         let promise = request.eventLoop.makePromise(of: FreshbooksInvoiceContent.self)
         DispatchQueue.global().async {
             promise.succeed(TestData.invoice)
@@ -43,7 +43,7 @@ struct TestData {
 
     static let tokenExchangeResponse = TokenExchangeResponse(accessToken: "", tokenType: "", expiresIn: 0, refreshToken: "", scope: "", createdAt: 0)
     static let userFetchResponsePayload = UserFetchResponsePayload(response: UserResponseObject(id: 0, firstName: "", lastName: "", businessMemberships: []))
-    static let fetchUserHandler: ((String, Request) throws -> (EventLoopFuture<UserFetchResponsePayload>))? = { string, request in
+    static let fetchUserHandler: ((String, Request) throws -> (EventLoopFuture<UserFetchResponsePayload>))? = { _, request in
         let promise = request.eventLoop.makePromise(of: UserFetchResponsePayload.self)
               DispatchQueue.global().async {
                   promise.succeed(TestData.userFetchResponsePayload)
@@ -51,7 +51,7 @@ struct TestData {
               return promise.futureResult
     }
 
-    static let freshbooksAuthHandler: ((String, Request) throws -> (EventLoopFuture<TokenExchangeResponse>))? = { string, request in
+    static let freshbooksAuthHandler: ((String, Request) throws -> (EventLoopFuture<TokenExchangeResponse>))? = { _, request in
         let promise = request.eventLoop.makePromise(of: TokenExchangeResponse.self)
         DispatchQueue.global().async {
             promise.succeed(TestData.tokenExchangeResponse)
@@ -60,6 +60,17 @@ struct TestData {
     }
 
     static let authRequest = AuthRequest(code: "dummyCode")
+}
+
+public extension Request {
+    func successPromiseAfterGlobalDispatchASync() -> EventLoopFuture<ClientResponse> {
+        let promise = eventLoop.makePromise(of: ClientResponse.self)
+        DispatchQueue.global().async {
+            let response = ClientResponse(status: .ok, headers: [:], body: nil)
+            promise.succeed(response)
+        }
+        return promise.futureResult
+    }
 }
 
 struct TestingDeleteWebhookRequestPayload: Codable {

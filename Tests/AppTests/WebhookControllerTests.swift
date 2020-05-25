@@ -43,7 +43,6 @@ class WebhookControllerTests: XCTestCase {
 
         let req = Request(application: application, on: application.eventLoopGroup.next())
         testUser = User(responseObject: TestData.userResponseObject, accessToken: TestData.userAccessToken)
-        testUser?.id = UUID()
         try? testUser?.save(on: req.db).wait()
         try? Business(business: TestData.business).save(on: req.db).wait()
 
@@ -136,16 +135,5 @@ class WebhookControllerTests: XCTestCase {
         }
 
         XCTAssertEqual(freshbooks.deleteWebhookCallCount, 1)
-    }
-}
-
-extension Request {
-    fileprivate func successPromiseAfterGlobalDispatchASync() -> EventLoopFuture<ClientResponse> {
-        let promise = eventLoop.makePromise(of: ClientResponse.self)
-        DispatchQueue.global().async {
-            let response = ClientResponse(status: .ok, headers: [:], body: nil)
-            promise.succeed(response)
-        }
-        return promise.futureResult
     }
 }
