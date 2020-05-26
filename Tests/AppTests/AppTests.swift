@@ -4,7 +4,7 @@ import XCTVapor
 
 final class AppTests: XCTestCase {
     var application: Application! = nil
-    let freshbooks = FreshbooksWebServicingMock()
+    let freshbooks = FreshbooksWebServicingMockWithDefaultHandlers()
     let slack = SlackWebServicingMock()
     lazy var webhookController = WebhookController(hostName: "localhost", slackService: slack, freshbooksService: freshbooks)
     let testUser = User(responseObject: TestData.userResponseObject, accessToken: TestData.userAccessToken)
@@ -14,8 +14,6 @@ final class AppTests: XCTestCase {
 
     override func setUp() {
         application = Application(Environment.testing)
-        freshbooks.authHandler = TestData.freshbooksAuthHandler
-        freshbooks.fetchUserHandler = TestData.fetchUserHandler
         let deps = ApplicationDependencies(freshbooksServicing: freshbooks, slackServicing: slack, hostname: "", clientID: "'")
         try? configure(application, dependencies: deps)
         try? testUser.save(on: application.db).wait()
@@ -33,7 +31,7 @@ final class AppTests: XCTestCase {
         let accountID = "accountID"
         let invoiceID = 123
         let accessToken = "AccessToken"
-        freshbooks.fetchInvoiceHandler = TestData.fetchInvoiceHandler
+//        freshbooks.fetchInvoiceHandler = TestData.fetchInvoiceHandler
         do {
             // fetch the invoice
             let invoice = try webhookController.getInvoice(accountID: accountID, invoiceID: invoiceID, accessToken: accessToken, on: req)
@@ -106,7 +104,6 @@ final class AppTests: XCTestCase {
     }
 
     func testCreateWebhook() throws {
-        freshbooks.registerNewWebhookHandler = TestData.registerNewWebhookHandler
         try setVaporCookie()
         // Now that we've authenticated a user, run the actual test
         try application.test(.POST, "webhooks/new",
@@ -120,7 +117,6 @@ final class AppTests: XCTestCase {
     }
 
     func testExecuteWebhook() throws {
-        freshbooks.fetchInvoiceHandler = TestData.fetchInvoiceHandler
         // set custom slack handler
         slack.sendSlackPayloadHandler = { string, emoji, request in
             XCTAssertEqual(string, "New invoice created to Uber Technologies, Inc, for 123 USD")

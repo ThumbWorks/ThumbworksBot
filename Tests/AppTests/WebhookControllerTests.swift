@@ -33,7 +33,7 @@ class WebhookControllerTests: XCTestCase {
     var testUser: User?
 
     let slack = SlackWebServicingMock()
-    let freshbooks = FreshbooksWebServicingMock()
+    let freshbooks = FreshbooksWebServicingMockWithDefaultHandlers()
     lazy var webhookController = WebhookController(hostName: "localhost", slackService: slack, freshbooksService: freshbooks)
 
     override func setUp() {
@@ -64,9 +64,6 @@ class WebhookControllerTests: XCTestCase {
             expectedSlackPayloadString = string
             return request.successPromiseAfterGlobalDispatchASync()
         }
-        
-        // use default fetchInvoiceHandler
-        freshbooks.fetchInvoiceHandler = TestData.fetchInvoiceHandler
         
         try? req.content.encode(TestData.freshbooksVerifiedWebhookContent)
         // Run the command

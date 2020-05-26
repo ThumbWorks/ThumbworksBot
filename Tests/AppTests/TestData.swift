@@ -9,6 +9,64 @@ import Foundation
 import XCTVapor
 @testable import App
 
+
+class FreshbooksWebServicingMockWithDefaultHandlers: FreshbooksWebServicingMock {
+    override var fetchInvoiceHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<FreshbooksInvoiceContent>))? {
+        get {
+            return { _, _, _, request in
+                let promise = request.eventLoop.makePromise(of: FreshbooksInvoiceContent.self)
+                DispatchQueue.global().async {
+                    promise.succeed(TestData.invoice)
+                }
+                return promise.futureResult
+            }
+        }
+        set {
+        }
+    }
+
+    override var fetchUserHandler: ((String, Request) throws -> (EventLoopFuture<UserFetchResponsePayload>))? {
+        get {
+
+            return  { _, request in
+                let promise = request.eventLoop.makePromise(of: UserFetchResponsePayload.self)
+                DispatchQueue.global().async {
+                    promise.succeed(TestData.userFetchResponsePayload)
+                }
+                return promise.futureResult
+            }
+        }
+        set {}
+    }
+
+    override var authHandler: ((String, Request) throws -> (EventLoopFuture<TokenExchangeResponse>))? {
+        get {
+            return { _, request in
+                let promise = request.eventLoop.makePromise(of: TokenExchangeResponse.self)
+                DispatchQueue.global().async {
+                    promise.succeed(TestData.tokenExchangeResponse)
+                }
+                return promise.futureResult
+            }
+        }
+        set {}
+    }
+
+    override var registerNewWebhookHandler: ((String, String, Request) throws -> (EventLoopFuture<NewWebhookPayload>))? {
+        get {
+
+            return { _, _, request in
+                let promise = request.eventLoop.makePromise(of: NewWebhookPayload.self)
+                DispatchQueue.global().async {
+                    promise.succeed(TestData.newWebhookResponse)
+                }
+                return promise.futureResult
+            }
+        }
+        set {}
+    }
+}
+
 struct TestData {
     static let authRequest = AuthRequest(code: "dummyCode")
     static let invoice = FreshbooksInvoiceContent(freshbooksID: 1,
@@ -34,13 +92,7 @@ struct TestData {
                                                                            accountID: "123")
     static let userAccessToken = "accessTokenOfUserSavedInDB"
 
-    static let fetchInvoiceHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<FreshbooksInvoiceContent>))? = { _, _, _, request in
-        let promise = request.eventLoop.makePromise(of: FreshbooksInvoiceContent.self)
-        DispatchQueue.global().async {
-            promise.succeed(TestData.invoice)
-        }
-        return promise.futureResult
-    }
+
 
     static let newWebhookResponse: NewWebhookPayload = {
         let callback = NewWebhookPayload.NewWebhookPayloadResult.NewWebhookPayloadCallback(callbackid: 123)
@@ -56,29 +108,6 @@ struct TestData {
                                                              scope: "",
                                                              createdAt: 0)
     static let userFetchResponsePayload = UserFetchResponsePayload(response: TestData.userResponseObject)
-    static let fetchUserHandler: ((String, Request) throws -> (EventLoopFuture<UserFetchResponsePayload>))? = { _, request in
-        let promise = request.eventLoop.makePromise(of: UserFetchResponsePayload.self)
-              DispatchQueue.global().async {
-                  promise.succeed(TestData.userFetchResponsePayload)
-              }
-              return promise.futureResult
-    }
-
-    static let freshbooksAuthHandler: ((String, Request) throws -> (EventLoopFuture<TokenExchangeResponse>))? = { _, request in
-        let promise = request.eventLoop.makePromise(of: TokenExchangeResponse.self)
-        DispatchQueue.global().async {
-            promise.succeed(TestData.tokenExchangeResponse)
-        }
-        return promise.futureResult
-    }
-
-    static let registerNewWebhookHandler: ((String, String, Request) throws -> (EventLoopFuture<NewWebhookPayload>))? = { _, _, request in
-        let promise = request.eventLoop.makePromise(of: NewWebhookPayload.self)
-        DispatchQueue.global().async {
-            promise.succeed(TestData.newWebhookResponse)
-        }
-        return promise.futureResult
-    }
 }
 
 public extension Request {
