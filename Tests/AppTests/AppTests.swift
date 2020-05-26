@@ -9,6 +9,9 @@ final class AppTests: XCTestCase {
     lazy var webhookController = WebhookController(hostName: "localhost", slackService: slack, freshbooksService: freshbooks)
     let testUser = User(responseObject: TestData.userResponseObject, accessToken: TestData.userAccessToken)
 
+    // For authenticated calls we need to store the session cookies
+    var vaporSessionCookie: String = ""
+
     override func setUp() {
         application = Application(Environment.testing)
         freshbooks.authHandler = TestData.freshbooksAuthHandler
@@ -18,7 +21,11 @@ final class AppTests: XCTestCase {
         try? testUser.save(on: application.db).wait()
         try? Business(business: TestData.business).save(on: application.db).wait()
         let req = Request(application: application, on: application.eventLoopGroup.next())
-        _ = try? UserSessionAuthenticator().authenticate(sessionID: TestData.userAccessToken, for: req).wait()
+        do {
+            try UserSessionAuthenticator().authenticate(sessionID: TestData.userAccessToken, for: req).wait()
+        } catch {
+            print(error)
+        }
     }
 
     func testFetchInvoice() throws {
@@ -71,19 +78,44 @@ final class AppTests: XCTestCase {
         }
     }
 
-    func testCreateWebhook() throws {
-        // When the user attempts the auth call with an auth request code
-        try application.test(.POST, "webhooks/new", beforeRequest: { request in
-            try request.query.encode(TestData.authRequest)
+
+    func testOauthFlow() throws {
+        try application.test(.GET, "freshbooks/auth", beforeRequest: { request in
+            let content = AuthRequest(code: "MockAuthCode")
+            try request.query.encode(content)
         }) { res in
             // Auth call to freshbooks happens
-            XCTAssertEqual(freshbooks.registerNewWebhookCallCount, 1)
+            XCTAssertEqual(freshbooks.authCallCount, 1)
 
             // Fetch user from freshbooks
             XCTAssertEqual(freshbooks.fetchUserCallCount, 1)
 
             // Return status should be .ok
             XCTAssertEqual(res.status, .ok)
+        }
+    }
+
+    private func setVaporCookie() throws {
+        // As part of the setup process, run the oauth flow
+         try application.test(.GET, "freshbooks/auth", beforeRequest: { request in
+             let content = AuthRequest(code: "MockAuthCode")
+             try request.query.encode(content)
+         }) { res in
+             vaporSessionCookie = res.headers["set-cookie"].first!
+         }
+    }
+
+    func testCreateWebhook() throws {
+        freshbooks.registerNewWebhookHandler = TestData.registerNewWebhookHandler
+        try setVaporCookie()
+        // Now that we've authenticated a user, run the actual test
+        try application.test(.POST, "webhooks/new",
+                             headers: ["Cookie" : vaporSessionCookie]) { res in
+                                // Auth call to freshbooks happens
+                                XCTAssertEqual(freshbooks.registerNewWebhookCallCount, 1)
+
+                                // Return status should be .ok
+                                XCTAssertEqual(res.status, .ok)
         }
     }
 
@@ -96,6 +128,7 @@ final class AppTests: XCTestCase {
             return request.successPromiseAfterGlobalDispatchASync()
         }
         try application.test(.POST, "webhooks/ready", beforeRequest: { request in
+            
             let content = FreshbooksWebhookTriggeredContent(freshbooksUserID: 123, name: "abc", objectID: 123, verified: true, verifier: nil, accountID: "abc")
             try request.content.encode(content)
         }) { res in

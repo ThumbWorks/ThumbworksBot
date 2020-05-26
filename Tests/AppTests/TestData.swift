@@ -10,6 +10,7 @@ import XCTVapor
 @testable import App
 
 struct TestData {
+    static let authRequest = AuthRequest(code: "dummyCode")
     static let invoice = FreshbooksInvoiceContent(freshbooksID: 1,
                                                   status: 2,
                                                   paymentStatus: "unpaid",
@@ -41,8 +42,20 @@ struct TestData {
         return promise.futureResult
     }
 
-    static let tokenExchangeResponse = TokenExchangeResponse(accessToken: "", tokenType: "", expiresIn: 0, refreshToken: "", scope: "", createdAt: 0)
-    static let userFetchResponsePayload = UserFetchResponsePayload(response: UserResponseObject(id: 0, firstName: "", lastName: "", businessMemberships: []))
+    static let newWebhookResponse: NewWebhookPayload = {
+        let callback = NewWebhookPayload.NewWebhookPayloadResult.NewWebhookPayloadCallback(callbackid: 123)
+        let result = NewWebhookPayload.NewWebhookPayloadResult(callback: callback)
+        let response = NewWebhookPayload.NewWebhookPayloadResponse(result: result)
+        return NewWebhookPayload(response: response)
+    }()
+
+    static let tokenExchangeResponse = TokenExchangeResponse(accessToken: userAccessToken,
+                                                             tokenType: "",
+                                                             expiresIn: 0,
+                                                             refreshToken: "",
+                                                             scope: "",
+                                                             createdAt: 0)
+    static let userFetchResponsePayload = UserFetchResponsePayload(response: TestData.userResponseObject)
     static let fetchUserHandler: ((String, Request) throws -> (EventLoopFuture<UserFetchResponsePayload>))? = { _, request in
         let promise = request.eventLoop.makePromise(of: UserFetchResponsePayload.self)
               DispatchQueue.global().async {
@@ -59,7 +72,13 @@ struct TestData {
         return promise.futureResult
     }
 
-    static let authRequest = AuthRequest(code: "dummyCode")
+    static let registerNewWebhookHandler: ((String, String, Request) throws -> (EventLoopFuture<NewWebhookPayload>))? = { _, _, request in
+        let promise = request.eventLoop.makePromise(of: NewWebhookPayload.self)
+        DispatchQueue.global().async {
+            promise.succeed(TestData.newWebhookResponse)
+        }
+        return promise.futureResult
+    }
 }
 
 public extension Request {
