@@ -36,8 +36,6 @@ public func routes(_ app: Application, dependencies: ApplicationDependencies) th
     app.get("webhooks", use: freshbooksController.index)
     app.post("webhooks", "ready", use: webhookController.ready)
     app.get("freshbooks", "token", use: freshbooksController.accessToken)
-    // TODO upgrade to v4
-    app.sessions.configuration.cookieName = "thumbworksbot"
     // Configures cookie value creation.
     app.sessions.configuration.cookieFactory = { sessionID in
         .init(string: sessionID.string, isSecure: true)
