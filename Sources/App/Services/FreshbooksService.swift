@@ -96,14 +96,35 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
         }
     }
 
+    struct ErrorResponse: Content {
+        let response: ErrorResponseErrors
+        struct ErrorResponseErrors: Content {
+            let errors: [ErrorContent]
+        }
+        struct ErrorContent: Content {
+            let errno: Int
+            let field: String
+            let message: String
+            let object: String
+            let value: String
+        }
+    }
     public func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent> {
         let url = URI.freshbooksInvoiceURL(accountID: accountID, invoiceID: invoiceID)
         let client = req.client
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
 
         return client.get(url, headers: provider.headers()).flatMapThrowing { response in
-            let package = try response.content.decode(InvoicePackage.self)
-            return package.response.result.invoice
+            do {
+                let package = try response.content.decode(InvoicePackage.self)
+                return package.response.result.invoice
+            } catch {
+                // Just catching any errors here. These are documented at https://www.freshbooks.com/api/errors
+                // I noticed this when testing to fetch a random object_id that didn't exist we got a 1012 UnknownResource error
+                let errorPayload = try response.content.decode(ErrorResponse.self)
+                print(errorPayload.response.errors)
+                throw error
+            }
         }
     }
 
