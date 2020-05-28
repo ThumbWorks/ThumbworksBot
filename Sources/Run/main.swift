@@ -9,7 +9,9 @@ try configure(app, dependencies: generateDependencies())
 try app.run()
 
 func generateDependencies() throws -> ApplicationDependencies {
-    let hostName = "https://thumbworksbot.ngrok.io"
+    guard let hostName = Environment.get("thumbworksbot_app_freshbooks_hostname") else {
+          throw RouterError.missingClientID
+      }
     guard let clientID = Environment.get("thumbworksbot_app_freshbooks_client_id") else {
         throw RouterError.missingClientID
     }

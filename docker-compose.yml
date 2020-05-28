@@ -28,6 +28,7 @@ x-shared_environment: &shared_environment
   thumbworksbot_app_freshbooks_client_id: ${thumbworksbot_app_freshbooks_client_id}
   thumbworksbot_app_freshbooks_secret: ${thumbworksbot_app_freshbooks_secret}
   thumbworksbot_app_freshbooks_slack_message_url: ${thumbworksbot_app_freshbooks_slack_message_url}
+  thumbworksbot_app_freshbooks_hostname: ${thumbworksbot_app_freshbooks_hostname}
 
 
 services:
