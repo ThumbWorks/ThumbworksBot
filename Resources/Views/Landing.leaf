@@ -1,5 +1,26 @@
 
 <html>
-logged out
-<a href = "https://auth.freshbooks.com/service/auth/oauth/authorize?client_id=#(client_id)&response_type=code&redirect_uri=https://thumbworksbot.ngrok.io/freshbooks/auth"> Login </a>
+<head>
+   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
+   </head>
+   <div class="container">
+      <div class="container">
+         <div class="row">
+           <div class="jumbotron">
+             <div class="container">
+               <h1 class="display-3">Thumbworks Freshbooks Bot</h1>
+               <hr class="my-2">
+               <p>Authenticate with Freshbooks to setup webhooks for freshbooks events.</p>
+               <p class="lead">
+                 <a class="btn btn-primary btn-lg" 
+                  href="https://auth.freshbooks.com/service/auth/oauth/authorize?client_id=#(client_id)&response_type=code&redirect_uri=https://thumbworksbot.ngrok.io/freshbooks/auth" 
+                    role="button">
+                 Freshbooks
+               </a>
+               </p>
+             </div>
+           </div>
+         </div>
+       </div>
+   </div>
 </html>
