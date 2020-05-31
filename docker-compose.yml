@@ -56,7 +56,7 @@ services:
     deploy:
       replicas: 0
   revert:
-    image: my-dockerized-app:latest
+    image: rodericj/thumbworksbot
     build:
       context: .
     environment:
