@@ -13,7 +13,7 @@
                <p>Authenticate with Freshbooks to setup webhooks for freshbooks events.</p>
                <p class="lead">
                  <a class="btn btn-primary btn-lg" 
-                  href="https://auth.freshbooks.com/service/auth/oauth/authorize?client_id=#(client_id)&response_type=code&redirect_uri=https://thumbworksbot.ngrok.io/freshbooks/auth" 
+                  href="https://auth.freshbooks.com/service/auth/oauth/authorize?client_id=#(client_id)&response_type=code&redirect_uri=#(hostname)/freshbooks/auth" 
                     role="button">
                  Freshbooks
                </a>

@@ -30,7 +30,7 @@ public func routes(_ app: Application, dependencies: ApplicationDependencies) th
 
     // The logged out view linking to the oauth flow
     app.get { req in
-        return req.view.render("Landing", ["client_id" : dependencies.clientID])
+        return req.view.render("Landing", ["client_id" : dependencies.clientID, "hostname": dependencies.hostname])
     }
 
     app.post("webhooks", use: freshbooksController.webhook)
