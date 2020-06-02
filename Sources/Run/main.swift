@@ -10,7 +10,7 @@ try app.run()
 
 func generateDependencies() throws -> ApplicationDependencies {
     guard let hostName = Environment.get("thumbworksbot_app_freshbooks_hostname") else {
-          throw RouterError.missingClientID
+          throw RouterError.missingHostName
       }
     guard let clientID = Environment.get("thumbworksbot_app_freshbooks_client_id") else {
         throw RouterError.missingClientID

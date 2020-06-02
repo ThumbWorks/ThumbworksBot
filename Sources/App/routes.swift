@@ -4,6 +4,7 @@ public enum RouterError: Error {
     case missingClientID
     case missingClientSecret
     case missingSlackURL
+    case missingHostName
 }
 
 public struct ApplicationDependencies {
