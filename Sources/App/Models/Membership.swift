@@ -40,7 +40,7 @@ struct CreateMembership: Migration {
             .id()
             .field("role", .string)
             .field("freshbooksID", .int)
-            .field("user_id", .uuid, .references("users", "id"))
+            .field("user_id", .uuid, .references(User.schema, "id"))
             .unique(on: "freshbooksID")
             .create()
     }

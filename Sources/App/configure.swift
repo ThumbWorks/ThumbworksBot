@@ -1,27 +1,23 @@
 import Vapor
 import Leaf
-import FluentSQLiteDriver
-import FluentSQL
+import FluentPostgresDriver
 import Fluent
-//import Jobs
 
 /// Called before your application initializes.
 public func configure(_ app: Application, dependencies: ApplicationDependencies) throws {
-
-//public func configure(_ config: inout Config, _ env: inout Environment, _ services: inout Services) throws {
     // Register providers first
     if app.environment == .testing {
-        app.databases.use(.sqlite(.memory), as: .sqlite)
+        app.databases.use(.postgres(hostname: "localhost", username: "vapor", password: "vapor", database: "vapor"), as: .psql)
     } else {
-        app.databases.use(.sqlite(.file("db.sqlite")), as: .sqlite)
+        app.databases.use(.postgres(hostname: "localhost", username: "roderic", password: "vapor", database: "vapor"), as: .psql)
     }
+    app.migrations.add(CreateBusiness())
     app.migrations.add(CreateUser())
     app.migrations.add(CreateMembership())
-    app.migrations.add(CreateBusiness())
     app.migrations.add(CreateMembershipBusiness())
     app.migrations.add(CreateWebhook())
     app.migrations.add(CreateInvoice())
-    app.sessions.use(.fluent(.sqlite))
+    app.sessions.use(.fluent(.psql))
     app.migrations.add(SessionRecord.migration)
     
     try app.autoMigrate().wait()

@@ -7,15 +7,14 @@
 
 import Foundation
 import Fluent
-import FluentSQL
-import FluentSQLiteDriver   
+import FluentPostgresDriver   
 
 final class Webhook: Model, Codable {
     static var schema: String = "webhooks" // TODO upgrade to v4, /shrug
 
     init() {}
 
-    typealias Database = SQLiteDatabase
+    typealias Database = PostgresDatabase
 
     @ID(key: .id)
     var id: UUID?

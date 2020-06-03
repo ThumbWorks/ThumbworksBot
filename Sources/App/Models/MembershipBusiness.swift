@@ -38,8 +38,8 @@ struct CreateMembershipBusiness: Migration {
     func prepare(on database: Database) -> EventLoopFuture<Void> {
         database.schema(MembershipBusiness.schema)
                    .id()
-            .field("business_id", .uuid, .required, .references("businesss", "id"))
-            .field("membership_id", .uuid, .required, .references("memberships", "id"))
+            .field("business_id", .uuid, .required, .references(Business.schema, "id"))
+            .field("membership_id", .uuid, .required, .references(Membership.schema, "id"))
             .create()
     }
 
