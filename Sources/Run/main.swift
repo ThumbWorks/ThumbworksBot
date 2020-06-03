@@ -22,6 +22,8 @@ func generateDependencies() throws -> ApplicationDependencies {
         throw RouterError.missingSlackURL
     }
 
+    let dbHost = Environment.get("DATABASE_URL")
+
     let slackMessageURL = URI(string: slackURIString)
     let slackServicing = SlackWebService(slackURL: slackMessageURL)
     let freshbookServicing = FreshbooksWebservice(hostname: hostName,
@@ -31,5 +33,6 @@ func generateDependencies() throws -> ApplicationDependencies {
     return ApplicationDependencies(freshbooksServicing: freshbookServicing,
                                    slackServicing: slackServicing,
                                    hostname: hostName,
-                                   clientID: clientID)
+                                   clientID: clientID,
+                                   databaseURLString: dbHost)
 }

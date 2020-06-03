@@ -5,6 +5,7 @@ public enum RouterError: Error {
     case missingClientSecret
     case missingSlackURL
     case missingHostName
+    case missingDatabaseHostURL
 }
 
 public struct ApplicationDependencies {
@@ -12,12 +13,14 @@ public struct ApplicationDependencies {
     let slackServicing: SlackWebServicing
     let hostname: String
     let clientID: String
+    let databaseURLString: String?
 
-    public init(freshbooksServicing: FreshbooksWebServicing, slackServicing: SlackWebServicing, hostname: String, clientID: String) {
+    public init(freshbooksServicing: FreshbooksWebServicing, slackServicing: SlackWebServicing, hostname: String, clientID: String, databaseURLString: String?) {
         self.freshbooksServicing = freshbooksServicing
         self.slackServicing = slackServicing
         self.hostname = hostname
         self.clientID = clientID
+        self.databaseURLString = databaseURLString
     }
 }
 /// Register your application's routes here.

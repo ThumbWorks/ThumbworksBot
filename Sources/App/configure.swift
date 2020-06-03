@@ -9,7 +9,10 @@ public func configure(_ app: Application, dependencies: ApplicationDependencies)
     if app.environment == .testing {
         app.databases.use(.postgres(hostname: "localhost", username: "vapor", password: "vapor", database: "vapor"), as: .psql)
     } else {
-        app.databases.use(.postgres(hostname: "localhost", username: "roderic", password: "vapor", database: "vapor"), as: .psql)
+        guard let host = dependencies.databaseURLString else {
+            throw RouterError.missingDatabaseHostURL
+        }
+        app.databases.use(try .postgres(url: host), as: .psql)
     }
     app.migrations.add(CreateBusiness())
     app.migrations.add(CreateUser())
