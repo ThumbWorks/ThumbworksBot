@@ -14,7 +14,7 @@ final class AppTests: XCTestCase {
 
     override func setUp() {
         application = Application(Environment.testing)
-        let deps = ApplicationDependencies(freshbooksServicing: freshbooks, slackServicing: slack, hostname: "", clientID: "'")
+        let deps = ApplicationDependencies(freshbooksServicing: freshbooks, slackServicing: slack, hostname: "", clientID: "'", databaseURLString: nil)
         try? configure(application, dependencies: deps)
         try? testUser.save(on: application.db).wait()
         try? Business(business: TestData.business).save(on: application.db).wait()

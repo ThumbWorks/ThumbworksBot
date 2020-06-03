@@ -38,7 +38,7 @@ class WebhookControllerTests: XCTestCase {
 
     override func setUp() {
         application = Application(Environment.testing)
-        let deps = ApplicationDependencies(freshbooksServicing: freshbooks, slackServicing: slack, hostname: "", clientID: "'")
+        let deps = ApplicationDependencies(freshbooksServicing: freshbooks, slackServicing: slack, hostname: "", clientID: "'", databaseURLString: nil)
         try? configure(application, dependencies: deps)
 
         let req = Request(application: application, on: application.eventLoopGroup.next())

@@ -6,7 +6,7 @@ import Fluent
 /// Called before your application initializes.
 public func configure(_ app: Application, dependencies: ApplicationDependencies) throws {
     // Register providers first
-    if app.environment == .testing {
+    if app.environment == .development {
         app.databases.use(.postgres(hostname: "localhost", username: "vapor", password: "vapor", database: "vapor"), as: .psql)
     } else {
         guard let host = dependencies.databaseURLString else {
