@@ -8,6 +8,8 @@ public func configure(_ app: Application, dependencies: ApplicationDependencies)
     // Register providers first
     if app.environment == .development {
         app.databases.use(.postgres(hostname: "localhost", username: "vapor", password: "vapor", database: "vapor"), as: .psql)
+    } else if app.environment == .testing {
+        app.databases.use(.postgres(hostname: "localhost", username: "vapor", password: "vapor", database: "vapor"), as: .psql)
     } else {
         guard let host = dependencies.databaseURLString else {
             throw RouterError.missingDatabaseHostURL
