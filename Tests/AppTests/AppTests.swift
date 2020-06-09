@@ -4,7 +4,7 @@ import XCTVapor
 
 
 final class AppTests: XCTestCase {
-    var application: Application! = nil
+    var application: Application?
     let freshbooks = FreshbooksWebServicingMockWithDefaultHandlers()
     let slack = SlackWebServicingMock()
     lazy var webhookController = WebhookController(hostName: "localhost", slackService: slack, freshbooksService: freshbooks)
@@ -15,14 +15,20 @@ final class AppTests: XCTestCase {
 
     override func setUp() {
         application = Application(Environment.testing)
+        guard let application = application else {
+            return
+        }
         defer {application.shutdown()}
         let deps = ApplicationDependencies(freshbooksServicing: freshbooks,
                                            slackServicing: slack,
                                            hostname: "",
                                            clientID: "'",
-                                           databaseURLString: nil) { sessionID, request in
+                                           databaseURLString: nil) { [weak self] sessionID, request in
                                             let promise = request.eventLoop.makePromise(of: Void.self)
                                             DispatchQueue.global().async {
+                                                if let strongSelf = self {
+                                                    request.auth.login(strongSelf.testUser)
+                                                }
                                                 promise.succeed(Void())
                                             }
                                             return promise.futureResult
@@ -41,6 +47,10 @@ final class AppTests: XCTestCase {
     }
 
 //    func testFetchInvoice() throws {
+//        guard let application = application else {
+//            XCTFail("Application not set up")
+//            return
+//        }
 //        let req = Request(application: application, on: application.eventLoopGroup.next())
 //        let accountID = "accountID"
 //        let invoiceID = 123
@@ -109,6 +119,9 @@ final class AppTests: XCTestCase {
 
     private func setVaporCookie() throws {
         // As part of the setup process, run the oauth flow
+        guard let application = application else {
+            return
+        }
          try application.test(.GET, "freshbooks/auth", beforeRequest: { request in
              let content = AuthRequest(code: "MockAuthCode")
              try request.query.encode(content)
