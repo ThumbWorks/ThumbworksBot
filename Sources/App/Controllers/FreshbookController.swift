@@ -12,9 +12,11 @@ import Fluent
 final class FreshbooksController {
     let app: Application
     let freshbooksService: FreshbooksWebServicing
-    init(freshbooksService: FreshbooksWebServicing, app: Application) {
+    let userSessionAuthenticator: UserSessionAuthenticator
+    init(freshbooksService: FreshbooksWebServicing, app: Application, userSessionAuthenticator: UserSessionAuthenticator) {
         self.freshbooksService = freshbooksService
         self.app = app
+        self.userSessionAuthenticator = userSessionAuthenticator
     }
 
     func index(_ req: Request) throws -> EventLoopFuture<View> {
@@ -58,7 +60,7 @@ final class FreshbooksController {
                                 return savableUser.save(on: req.db).flatMapThrowing { Void  in
                                     return try savableUser.addMemberships(from: userResponse.response, on: req)
                                 }.flatMap { user in
-                                    return UserSessionAuthenticator().authenticate(sessionID: tokenResponse.accessToken, for: req)
+                                    return self.userSessionAuthenticator.authenticate(sessionID: tokenResponse.accessToken, for: req)
                                 }
                         }
                 }

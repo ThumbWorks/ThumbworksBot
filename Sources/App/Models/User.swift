@@ -9,14 +9,14 @@ import Vapor
 import Fluent
 
 
-final class User: Model {
-    static var schema: String = "users"
+final public class User: Model {
+    public static var schema: String = "users"
 
     @ID(key: .id)
-    var id: UUID?
+    public var id: UUID?
 
     @Field(key: "accessToken")
-    var accessToken: String
+    public var accessToken: String
 
     @Field(key: "freshbooksID")
     var freshbooksID: Int
@@ -30,7 +30,7 @@ final class User: Model {
     @Children(for: \.$user)
     var businessMemberships: [Membership]
 
-    init() {}
+    public init() {}
 
     init(responseObject: UserResponseObject, accessToken: String) {
         // TODO add the businessMemberships to the user
@@ -64,21 +64,19 @@ extension User {
 }
 
 extension User: SessionAuthenticatable {
-    var sessionID: String {
+    public var sessionID: String {
         return accessToken
     }
 }
 
+
 struct UserSessionAuthenticator: SessionAuthenticator {
+    let authenticationClosure: ((_ sessionID: String, _ request: Request) -> EventLoopFuture<Void>)
     typealias User = App.User
+
+
     func authenticate(sessionID: String, for request: Request) -> EventLoopFuture<Void> {
-        User.query(on: request.db)
-            .filter(\.$accessToken, .equal, sessionID)
-            .first()
-            .unwrap(or: Abort(.notFound))
-            .map { user in
-                request.auth.login(user)
-        }
+        authenticationClosure(sessionID, request)
     }
 }
 

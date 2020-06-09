@@ -14,19 +14,30 @@ public struct ApplicationDependencies {
     let hostname: String
     let clientID: String
     let databaseURLString: String?
+    let authenticationClosure: ((_ sessionID: String, _ request: Request) -> EventLoopFuture<Void>)
 
-    public init(freshbooksServicing: FreshbooksWebServicing, slackServicing: SlackWebServicing, hostname: String, clientID: String, databaseURLString: String?) {
+    public init(freshbooksServicing: FreshbooksWebServicing,
+                slackServicing: SlackWebServicing,
+                hostname: String,
+                clientID: String,
+                databaseURLString: String?,
+                authenticationClosure:  @escaping ((_ sessionID: String, _ request: Request) -> EventLoopFuture<Void>)) {
         self.freshbooksServicing = freshbooksServicing
         self.slackServicing = slackServicing
         self.hostname = hostname
         self.clientID = clientID
         self.databaseURLString = databaseURLString
+        self.authenticationClosure = authenticationClosure
     }
 }
 /// Register your application's routes here.
 public func routes(_ app: Application, dependencies: ApplicationDependencies) throws {
 
-    let freshbooksController = FreshbooksController(freshbooksService: dependencies.freshbooksServicing, app: app)
+    let userSessionAuthenticator = UserSessionAuthenticator { dependencies.authenticationClosure($0, $1) }
+
+    let freshbooksController = FreshbooksController(freshbooksService: dependencies.freshbooksServicing,
+                                                    app: app,
+                                                    userSessionAuthenticator: userSessionAuthenticator)
     let webhookController = WebhookController(hostName: dependencies.hostname,
                                               slackService: dependencies.slackServicing,
                                               freshbooksService: dependencies.freshbooksServicing)
@@ -45,10 +56,8 @@ public func routes(_ app: Application, dependencies: ApplicationDependencies) th
         .init(string: sessionID.string, isSecure: true)
     }
 
-//    let authenticatedUserGroup = app.grouped([session])
-
     let protected = app.grouped(app.sessions.middleware,
-                                UserSessionAuthenticator())
+                                userSessionAuthenticator)
 
     protected.get("freshbooks", "auth", use: freshbooksController.freshbooksAuth)
     protected.get("webhooks", use: webhookController.webhooks)

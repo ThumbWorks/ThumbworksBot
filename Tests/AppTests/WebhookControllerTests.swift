@@ -35,13 +35,34 @@ class WebhookControllerTests: XCTestCase {
     let slack = SlackWebServicingMock()
     let freshbooks = FreshbooksWebServicingMockWithDefaultHandlers()
     lazy var webhookController = WebhookController(hostName: "localhost", slackService: slack, freshbooksService: freshbooks)
-
+    lazy var deps = ApplicationDependencies(freshbooksServicing: freshbooks,
+                                            slackServicing: slack,
+                                            hostname: "",
+                                            clientID: "'",
+                                            databaseURLString: nil) { sessionID, request in
+                                                let promise = request.eventLoop.makePromise(of: Void.self)
+                                                DispatchQueue.global().async {
+                                                    promise.succeed(Void())
+                                                }
+                                                return promise.futureResult
+    }
     override func setUp() {
+
+
         application = Application(Environment.testing)
-        let deps = ApplicationDependencies(freshbooksServicing: freshbooks, slackServicing: slack, hostname: "", clientID: "'", databaseURLString: nil)
+
         try? configure(application, dependencies: deps)
 
+
         let req = Request(application: application, on: application.eventLoopGroup.next())
+        // remove all businesses
+        try? Business.query(on: req.db).all().wait().forEach { object in
+            try? object.delete(on: req.db).wait()
+        }
+        
+        try? User.query(on: req.db).all().wait().forEach { user in
+            try? user.delete(on: req.db).wait()
+        }
         testUser = User(responseObject: TestData.userResponseObject, accessToken: TestData.userAccessToken)
         try? testUser?.save(on: req.db).wait()
         try? Business(business: TestData.business).save(on: req.db).wait()
@@ -50,6 +71,25 @@ class WebhookControllerTests: XCTestCase {
             let _ = try Webhook(webhookID: 123, userID: try testUser!.requireID()).save(on: req.db).wait()
         } catch {
             print(error)
+        }
+    }
+
+    override func tearDown() {
+        let req = Request(application: application, on: application.eventLoopGroup.next())
+
+        // remove all users
+        try? User.query(on: req.db).all().wait().forEach { object in
+            try? object.delete(on: req.db).wait()
+        }
+
+        // remove all webhooks
+        try? Webhook.query(on: req.db).all().wait().forEach { object in
+            try? object.delete(on: req.db).wait()
+        }
+
+        // remove all businesses
+        try? Business.query(on: req.db).all().wait().forEach { object in
+            try? object.delete(on: req.db).wait()
         }
     }
 
@@ -109,13 +149,14 @@ class WebhookControllerTests: XCTestCase {
 
     func testDeleteWebhook() throws {
         let req = Request(application: application, on: application.eventLoopGroup.next())
-
+        print(req.auth.login(testUser!))
         freshbooks.deleteWebhookHandler = { userID, webhookID, request in
             XCTAssertNotNil(TestData.business.accountID)
             XCTAssertEqual(TestData.business.accountID, userID)
             return request.successPromiseAfterGlobalDispatchASync()
         }
-        _ = try UserSessionAuthenticator().authenticate(sessionID: TestData.userAccessToken, for: req).wait()
+        let userAuthenticator = UserSessionAuthenticator(authenticationClosure: deps.authenticationClosure)
+        _ = try userAuthenticator.authenticate(sessionID: TestData.userAccessToken, for: req).wait()
         try req.query.encode(TestingDeleteWebhookRequestPayload(id: 123))
 
         // Ensure that the webhook exists before we attempt to delete it
