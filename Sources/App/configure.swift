@@ -23,6 +23,7 @@ public func configure(_ app: Application, dependencies: ApplicationDependencies)
     app.migrations.add(CreateWebhook())
     app.migrations.add(CreateInvoice())
     app.sessions.use(.fluent(.psql))
+
     app.migrations.add(SessionRecord.migration)
     
     try app.autoMigrate().wait()
@@ -43,7 +44,7 @@ public func configure(_ app: Application, dependencies: ApplicationDependencies)
     ContentConfiguration.global.use(decoder: decoder, for: .json)
 
     app.middleware.use(ErrorMiddleware.default(environment: app.environment))
-    app.middleware.use(app.sessions.middleware)
+
     try routes(app, dependencies: dependencies)
 
 }
