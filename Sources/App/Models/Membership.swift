@@ -17,9 +17,6 @@ final class Membership: Model {
     @Field(key: "role")
     var role: String
 
-    @Field(key: "freshbooksID")
-    var freshbooksID: Int
-
     @Parent(key: "user_id")
     var user: User
 

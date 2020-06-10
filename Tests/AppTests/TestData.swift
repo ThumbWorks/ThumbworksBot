@@ -68,6 +68,8 @@ class FreshbooksWebServicingMockWithDefaultHandlers: FreshbooksWebServicingMock 
 }
 
 struct TestData {
+    static let userAccountID = 123
+    static let businessAccountID = "xyz123"
     static let authRequest = AuthRequest(code: "dummyCode")
     static let invoice = FreshbooksInvoiceContent(freshbooksID: 1,
                                                   status: 2,
@@ -75,17 +77,17 @@ struct TestData {
                                                   currentOrganization: Emoji.uber.rawValue,
                                                   amount: FreshbooksInvoiceContent.Amount(amount: "123", code: "USD"),
                                                   createdAt: Date())
-    static let business = BusinessPayload(id: 345, name: "Thumbworks", accountID: "businessAccountID")
-    static let membership = MembershipPayload(id: 123, role: "manager", business: TestData.business)
-    static let userResponseObject = UserResponseObject(id: 123, firstName: "rod", lastName: "campbell", businessMemberships: [TestData.membership])
+    static let business = BusinessPayload(id: 345, name: "Thumbworks", accountID: businessAccountID)
+    static let membership = MembershipPayload(id: 123, role: "manager", business: business)
+    static let userResponseObject = UserResponseObject(id: userAccountID, firstName: "rod", lastName: "campbell", businessMemberships: [membership])
     static let freshbooksVerifiedWebhookContent = FreshbooksWebhookTriggeredContent(freshbooksUserID: 1,
-                                                                                    name: "create an invoice",
+                                                                                    name: WebhookType.invoiceCreate.rawValue,
                                                                                     objectID: 123,
                                                                                     verified: true,
                                                                                     verifier: nil,
-                                                                                    accountID: "123")
+                                                                                    accountID: businessAccountID)
     static let freshbooksVerifyContent = FreshbooksWebhookTriggeredContent(freshbooksUserID: 1,
-                                                                           name: "create an invoice",
+                                                                           name: WebhookType.invoiceCreate.rawValue,
                                                                            objectID: 123,
                                                                            verified: false,
                                                                            verifier: "abc",

@@ -47,57 +47,94 @@ class WebhookControllerTests: XCTestCase {
                                                 }
                                                 return promise.futureResult
     }
+
     override func setUp() {
-
-
         application = Application(Environment.testing)
-
         try? configure(application, dependencies: deps)
-
-
         let req = Request(application: application, on: application.eventLoopGroup.next())
-        // remove all businesses
-        try? Business.query(on: req.db).all().wait().forEach { object in
-            try? object.delete(on: req.db).wait()
+        let user = User(responseObject: TestData.userResponseObject,
+                        accessToken: TestData.userAccessToken)
+        testUser = user
+        try? user.save(on: req.db).wait()
+        guard let userID = try? user.requireID() else {
+            return
         }
-        
-        try? User.query(on: req.db).all().wait().forEach { user in
-            try? user.delete(on: req.db).wait()
+        let membershipPayload = MembershipPayload(id: 1234, role: "manager", business: TestData.business)
+        let membership = Membership(membershipPayload: membershipPayload, userID: userID)
+
+        _ = membership.save(on: req.db).flatMap { _ -> EventLoopFuture<Void> in
+            let business = Business(business: membershipPayload.business)
+            return business.save(on: req.db).flatMap { _  in
+                return membership.$businesses.attach(business, on: req.db)
+            }
         }
-        testUser = User(responseObject: TestData.userResponseObject, accessToken: TestData.userAccessToken)
-        try? testUser?.save(on: req.db).wait()
-        try? Business(business: TestData.business).save(on: req.db).wait()
 
         do {
-            let _ = try Webhook(webhookID: 123, userID: try testUser!.requireID()).save(on: req.db).wait()
+            let _ = try Webhook(webhookID: 123, userID: userID).save(on: req.db).wait()
         } catch {
             print(error)
         }
     }
 
     override func tearDown() {
+
+        // Order matters when deleting all of these things.
+        print("start the cleanup")
         let req = Request(application: application, on: application.eventLoopGroup.next())
 
-        // remove all users
-        try? User.query(on: req.db).all().wait().forEach { object in
-            try? object.delete(on: req.db).wait()
-        }
-
+        print("delete all webhooks")
         // remove all webhooks
         try? Webhook.query(on: req.db).all().wait().forEach { object in
             try? object.delete(on: req.db).wait()
         }
 
+        print("delete all MembershipBusiness")
+        // remove all businesses
+        try? MembershipBusiness.query(on: req.db).all().wait().forEach { object in
+            try? object.delete(on: req.db).wait()
+        }
+
+        print("delete all Business")
         // remove all businesses
         try? Business.query(on: req.db).all().wait().forEach { object in
             try? object.delete(on: req.db).wait()
         }
+
+        print("delete all Membership")
+        // remove all businesses
+        try? Membership.query(on: req.db).all().wait().forEach { object in
+            try? object.delete(on: req.db).wait()
+        }
+
+        print("delete all users")
+        // remove all users
+        try? User.query(on: req.db).all().wait().forEach { object in
+            try? object.delete(on: req.db).wait()
+        }
     }
 
+    func testExecuteWebhookUpdateInvoice() throws {
+        let req = Request(application: application, on: application.eventLoopGroup.next())
+        let executeWebhookPayload = FreshbooksWebhookTriggeredContent(freshbooksUserID: 123,
+                                                                      name: WebhookType.invoiceUpdate.rawValue,
+                                                                      objectID: 123,
+                                                                      verified: true,
+                                                                      verifier: nil,
+                                                                      accountID: TestData.business.accountID ?? "booo")
+        try req.content.encode(executeWebhookPayload)
+
+        _ = try webhookController.ready(req).flatMapError({ error -> EventLoopFuture<HTTPStatus> in
+            XCTFail("We should implment invoice update")
+            return req.eventLoop.makeSucceededFuture(.ok)
+        })
+        XCTAssertThrowsError(try webhookController.ready(req).wait())
+        XCTAssertEqual(slack.sendSlackPayloadCallCount, 0)
+    }
+    
     func testSlackMessageGetsSentOnVerifiedWebhook() throws {
         let req = Request(application: application, on: application.eventLoopGroup.next())
         var expectedEmoji: Emoji? = Emoji.apple
-        var expectedSlackPayloadString: String = "shouldChange"
+        var expectedSlackPayloadString: String = "New invoice created to Uber Technologies, Inc, for 123 USD"
         
         // set custom slack handler
         slack.sendSlackPayloadHandler = { string, emoji, request in

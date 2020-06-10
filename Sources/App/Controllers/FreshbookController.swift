@@ -164,7 +164,7 @@ struct MembershipPayload: Content {
     let business: BusinessPayload
 }
 
-struct BusinessPayload: Content {
+struct BusinessPayload: Content { // https://www.freshbooks.com/api/me_endpoint
     let id: Int
     let name: String
     let accountID: String?

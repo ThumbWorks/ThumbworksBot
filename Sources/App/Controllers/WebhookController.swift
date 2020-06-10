@@ -21,6 +21,8 @@ enum WebhookError: Error {
     case webhookNotFound
     case orphanedWebhook
     case unableToParseWebhook
+    case businessNotFound
+    case unknown(String)
 }
 
 final public  class WebhookController {
