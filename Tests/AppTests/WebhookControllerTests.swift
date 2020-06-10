@@ -34,11 +34,12 @@ class WebhookControllerTests: XCTestCase {
 
     let slack = SlackWebServicingMock()
     let freshbooks = FreshbooksWebServicingMockWithDefaultHandlers()
-    lazy var webhookController = WebhookController(hostName: "localhost", slackService: slack, freshbooksService: freshbooks)
+    lazy var webhookController = WebhookController(hostName: "localhost", slackService: slack, freshbooksService: freshbooks, clientID: "abc", clientSecret: "secret")
     lazy var deps = ApplicationDependencies(freshbooksServicing: freshbooks,
                                             slackServicing: slack,
                                             hostname: "",
                                             clientID: "'",
+                                            clientSecret: "secret",
                                             databaseURLString: nil) { sessionID, request in
                                                 let promise = request.eventLoop.makePromise(of: Void.self)
                                                 DispatchQueue.global().async {

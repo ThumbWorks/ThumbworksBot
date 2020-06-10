@@ -8,15 +8,15 @@ import Vapor
 @testable import App
 
 
-class SlackWebServicingMock: SlackWebServicing {
-    init() { }
-    init(req: Request? = nil) {
+public class SlackWebServicingMock: SlackWebServicing {
+    public init() { }
+    public init(req: Request? = nil) {
         self.req = req
     }
 
-    var sendSlackPayloadCallCount = 0
-    var sendSlackPayloadHandler: ((String, Emoji?, Request) throws -> (EventLoopFuture<ClientResponse>))?
-    func sendSlackPayload(text: String, with emoji: Emoji?, on req: Request) throws -> EventLoopFuture<ClientResponse> {
+    public var sendSlackPayloadCallCount = 0
+    public var sendSlackPayloadHandler: ((String, Emoji?, Request) throws -> (EventLoopFuture<ClientResponse>))?
+    public func sendSlackPayload(text: String, with emoji: Emoji?, on req: Request) throws -> EventLoopFuture<ClientResponse> {
         sendSlackPayloadCallCount += 1
         if let sendSlackPayloadHandler = sendSlackPayloadHandler {
             return try sendSlackPayloadHandler(text, emoji, req)
@@ -24,17 +24,17 @@ class SlackWebServicingMock: SlackWebServicing {
         fatalError("sendSlackPayloadHandler returns can't have a default value thus its handler must be set")
     }
 
-    var reqSetCallCount = 0
-    var req: Request? = nil { didSet { reqSetCallCount += 1 } }
+    public var reqSetCallCount = 0
+    public var req: Request? = nil { didSet { reqSetCallCount += 1 } }
 }
 
-class FreshbooksWebServicingMock: FreshbooksWebServicing {
-    init() { }
+public class FreshbooksWebServicingMock: FreshbooksWebServicing {
+    public init() { }
 
 
-    var deleteWebhookCallCount = 0
-    var deleteWebhookHandler: ((String, Int, Request) throws -> (EventLoopFuture<ClientResponse>))?
-    func deleteWebhook(accountID: String, webhookID: Int, on req: Request) throws -> EventLoopFuture<ClientResponse> {
+    public var deleteWebhookCallCount = 0
+    public var deleteWebhookHandler: ((String, Int, Request) throws -> (EventLoopFuture<ClientResponse>))?
+    public func deleteWebhook(accountID: String, webhookID: Int, on req: Request) throws -> EventLoopFuture<ClientResponse> {
         deleteWebhookCallCount += 1
         if let deleteWebhookHandler = deleteWebhookHandler {
             return try deleteWebhookHandler(accountID, webhookID, req)
@@ -42,19 +42,19 @@ class FreshbooksWebServicingMock: FreshbooksWebServicing {
         fatalError("deleteWebhookHandler returns can't have a default value thus its handler must be set")
     }
 
-    var registerNewWebhookCallCount = 0
-    var registerNewWebhookHandler: ((String, String, Request) throws -> (EventLoopFuture<NewWebhookPayload>))?
-    func registerNewWebhook(accountID: String, accessToken: String, on req: Request) throws -> EventLoopFuture<NewWebhookPayload> {
+    public var registerNewWebhookCallCount = 0
+    public var registerNewWebhookHandler: ((String, String, WebhookType, Client) throws -> (EventLoopFuture<NewWebhookPayload>))?
+    public func registerNewWebhook(accountID: String, accessToken: String, type: WebhookType, with client: Client) throws -> EventLoopFuture<NewWebhookPayload> {
         registerNewWebhookCallCount += 1
         if let registerNewWebhookHandler = registerNewWebhookHandler {
-            return try registerNewWebhookHandler(accountID, accessToken, req)
+            return try registerNewWebhookHandler(accountID, accessToken, type, client)
         }
         fatalError("registerNewWebhookHandler returns can't have a default value thus its handler must be set")
     }
 
-    var fetchWebhooksCallCount = 0
-    var fetchWebhooksHandler: ((String, String, Request) throws -> (EventLoopFuture<FreshbooksWebhookResponseResult>))?
-    func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult> {
+    public var fetchWebhooksCallCount = 0
+    public var fetchWebhooksHandler: ((String, String, Request) throws -> (EventLoopFuture<FreshbooksWebhookResponseResult>))?
+    public func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult> {
         fetchWebhooksCallCount += 1
         if let fetchWebhooksHandler = fetchWebhooksHandler {
             return try fetchWebhooksHandler(accountID, accessToken, req)
@@ -62,9 +62,9 @@ class FreshbooksWebServicingMock: FreshbooksWebServicing {
         fatalError("fetchWebhooksHandler returns can't have a default value thus its handler must be set")
     }
 
-    var fetchInvoiceCallCount = 0
-    var fetchInvoiceHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<FreshbooksInvoiceContent>))?
-    func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent> {
+    public var fetchInvoiceCallCount = 0
+    public var fetchInvoiceHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<FreshbooksInvoiceContent>))?
+    public func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent> {
         fetchInvoiceCallCount += 1
         if let fetchInvoiceHandler = fetchInvoiceHandler {
             return try fetchInvoiceHandler(accountID, invoiceID, accessToken, req)
@@ -72,9 +72,9 @@ class FreshbooksWebServicingMock: FreshbooksWebServicing {
         fatalError("fetchInvoiceHandler returns can't have a default value thus its handler must be set")
     }
 
-    var fetchUserCallCount = 0
-    var fetchUserHandler: ((String, Request) throws -> (EventLoopFuture<UserFetchResponsePayload>))?
-    func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserFetchResponsePayload> {
+    public var fetchUserCallCount = 0
+    public var fetchUserHandler: ((String, Request) throws -> (EventLoopFuture<UserFetchResponsePayload>))?
+    public func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserFetchResponsePayload> {
         fetchUserCallCount += 1
         if let fetchUserHandler = fetchUserHandler {
             return try fetchUserHandler(accessToken, req)
@@ -82,9 +82,9 @@ class FreshbooksWebServicingMock: FreshbooksWebServicing {
         fatalError("fetchUserHandler returns can't have a default value thus its handler must be set")
     }
 
-    var fetchInvoicesCallCount = 0
-    var fetchInvoicesHandler: ((String, String, Int, Request) throws -> (EventLoopFuture<InvoicesMetaDataContent>))?
-    func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent> {
+    public var fetchInvoicesCallCount = 0
+    public var fetchInvoicesHandler: ((String, String, Int, Request) throws -> (EventLoopFuture<InvoicesMetaDataContent>))?
+    public func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent> {
         fetchInvoicesCallCount += 1
         if let fetchInvoicesHandler = fetchInvoicesHandler {
             return try fetchInvoicesHandler(accountID, accessToken, page, req)
@@ -92,9 +92,9 @@ class FreshbooksWebServicingMock: FreshbooksWebServicing {
         fatalError("fetchInvoicesHandler returns can't have a default value thus its handler must be set")
     }
 
-    var confirmWebhookCallCount = 0
-    var confirmWebhookHandler: ((String, Request) throws -> (EventLoopFuture<ClientResponse>))?
-    func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse> {
+    public var confirmWebhookCallCount = 0
+    public var confirmWebhookHandler: ((String, Request) throws -> (EventLoopFuture<ClientResponse>))?
+    public func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse> {
         confirmWebhookCallCount += 1
         if let confirmWebhookHandler = confirmWebhookHandler {
             return try confirmWebhookHandler(accessToken, req)
@@ -102,9 +102,9 @@ class FreshbooksWebServicingMock: FreshbooksWebServicing {
         fatalError("confirmWebhookHandler returns can't have a default value thus its handler must be set")
     }
 
-    var authCallCount = 0
-    var authHandler: ((String, Request) throws -> (EventLoopFuture<TokenExchangeResponse>))?
-    func auth(with code: String, on req: Request) throws -> EventLoopFuture<TokenExchangeResponse> {
+    public var authCallCount = 0
+    public var authHandler: ((String, Request) throws -> (EventLoopFuture<TokenExchangeResponse>))?
+    public func auth(with code: String, on req: Request) throws -> EventLoopFuture<TokenExchangeResponse> {
         authCallCount += 1
         if let authHandler = authHandler {
             return try authHandler(code, req)

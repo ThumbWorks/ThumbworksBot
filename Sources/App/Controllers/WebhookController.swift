@@ -27,10 +27,14 @@ final public  class WebhookController {
     let freshbooksService: FreshbooksWebServicing
     let hostName: String
     let slackService: SlackWebServicing
-    init(hostName: String, slackService: SlackWebServicing, freshbooksService: FreshbooksWebServicing) {
+    let clientID: String
+    let clientSecret: String
+    init(hostName: String, slackService: SlackWebServicing, freshbooksService: FreshbooksWebServicing, clientID: String, clientSecret: String) {
         self.hostName = hostName
         self.slackService = slackService
         self.freshbooksService = freshbooksService
+        self.clientID = clientID
+        self.clientSecret = clientSecret
     }
 
     // The webhook receiver.
@@ -105,17 +109,20 @@ final public  class WebhookController {
                         throw UserError.noAccessToken
                     }
 
-                    let webhookPayload = try self.freshbooksService.registerNewWebhook(accountID: accountID, accessToken: accessToken, on: req)
-                    return webhookPayload.flatMap { payload in
-                        do {
-                            let callbackID = payload.response.result.callback.callbackid
-                            return Webhook(webhookID: callbackID, userID: try user.requireID())
-                                .save(on: req.db)
-                                .map { _ in HTTPStatus.ok }
-                        } catch {
-                            return req.eventLoop.makeFailedFuture(error)
-                        }
+                    _ = WebhookType.allCases.forEach { type in
+                        print("Queuing request to create \(type)")
+                        _ = req.queue.dispatch(RegisterWebhookJob.self,
+                                               .init(accountID: accountID,
+                                                     accessToken: accessToken,
+                                                     type: type,
+                                                     hostName: self.hostName,
+                                                     clientID: self.clientID,
+                                                     clientSecret: self.clientSecret,
+                                                     user: user)
+                        )
                     }
+                    return req.eventLoop.makeSucceededFuture(.ok)
+
                 } catch {
                     return req.eventLoop.makeFailedFuture(error)
                 }
@@ -248,5 +255,54 @@ extension User {
             .unwrap(or: Abort(.notFound)).map { business in
                 return business.accountID
         }
+    }
+}
+
+import Queues
+
+struct RegisterWebhookPayload: Codable {
+    let accountID: String
+    let accessToken: String
+    let type: WebhookType
+    let hostName: String
+    let clientID: String
+    let clientSecret: String
+    let user: User
+}
+
+struct RegisterWebhookJob: Job {
+    static var schema: String = "_job"
+
+    typealias Payload = RegisterWebhookPayload
+    func dequeue(_ context: QueueContext, _ payload: Payload) -> EventLoopFuture<Void> {
+        let service = FreshbooksWebservice(hostname: payload.hostName,
+                                           clientID: payload.clientID,
+                                           clientSecret: payload.clientSecret)
+        let user = payload.user
+        do {
+            return try service.registerNewWebhook(accountID: payload.accountID,
+                                                  accessToken: payload.accessToken,
+                                                  type: payload.type,
+                                                  with: context.application.client)
+                .flatMap({ payload -> EventLoopFuture<Void> in
+                    do {
+                        let callbackID = payload.response.result.callback.callbackid
+                        return Webhook(webhookID: callbackID, userID: try user.requireID())
+                            .save(on: context.application.db)
+                    } catch {
+                        return context.eventLoop.makeFailedFuture(error)
+                    }
+                })
+        } catch {
+            return context.eventLoop.makeFailedFuture(error)
+        }
+    }
+
+    static func serializePayload(_ payload: WebhookType) throws -> [UInt8] {
+        return Array(payload.rawValue.utf8)
+    }
+
+    static func parsePayload(_ bytes: [UInt8]) throws -> WebhookType {
+        return WebhookType(rawValue: String(decoding: bytes, as: UTF8.self)) ?? .unknown
     }
 }

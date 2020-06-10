@@ -2,6 +2,7 @@ import Vapor
 import Leaf
 import FluentPostgresDriver
 import Fluent
+import QueuesFluentDriver
 
 /// Called before your application initializes.
 public func configure(_ app: Application, dependencies: ApplicationDependencies) throws {
@@ -22,6 +23,7 @@ public func configure(_ app: Application, dependencies: ApplicationDependencies)
     app.migrations.add(CreateMembershipBusiness())
     app.migrations.add(CreateWebhook())
     app.migrations.add(CreateInvoice())
+    app.migrations.add(JobModelMigrate())
     app.sessions.use(.fluent(.psql))
 
     app.migrations.add(SessionRecord.migration)
@@ -45,6 +47,12 @@ public func configure(_ app: Application, dependencies: ApplicationDependencies)
 
     app.middleware.use(ErrorMiddleware.default(environment: app.environment))
 
+    app.queues.use(.fluent())
+
+    let registerJob = RegisterWebhookJob()
+    app.queues.add(registerJob)
     try routes(app, dependencies: dependencies)
+
+    try app.queues.startInProcessJobs(on: .default)
 
 }

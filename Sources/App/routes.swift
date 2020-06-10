@@ -13,6 +13,7 @@ public struct ApplicationDependencies {
     let slackServicing: SlackWebServicing
     let hostname: String
     let clientID: String
+    let clientSecret: String
     let databaseURLString: String?
     let authenticationClosure: ((_ sessionID: String, _ request: Request) -> EventLoopFuture<Void>)
 
@@ -20,12 +21,14 @@ public struct ApplicationDependencies {
                 slackServicing: SlackWebServicing,
                 hostname: String,
                 clientID: String,
+                clientSecret: String,
                 databaseURLString: String?,
                 authenticationClosure:  @escaping ((_ sessionID: String, _ request: Request) -> EventLoopFuture<Void>)) {
         self.freshbooksServicing = freshbooksServicing
         self.slackServicing = slackServicing
         self.hostname = hostname
         self.clientID = clientID
+        self.clientSecret = clientSecret
         self.databaseURLString = databaseURLString
         self.authenticationClosure = authenticationClosure
     }
@@ -40,7 +43,9 @@ public func routes(_ app: Application, dependencies: ApplicationDependencies) th
                                                     userSessionAuthenticator: userSessionAuthenticator)
     let webhookController = WebhookController(hostName: dependencies.hostname,
                                               slackService: dependencies.slackServicing,
-                                              freshbooksService: dependencies.freshbooksServicing)
+                                              freshbooksService: dependencies.freshbooksServicing,
+                                              clientID: dependencies.clientID,
+                                              clientSecret: dependencies.clientSecret)
 
     // The logged out view linking to the oauth flow
     app.get { req in

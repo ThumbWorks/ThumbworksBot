@@ -80,7 +80,7 @@
         </table>
     </div>
 
-    <button type="button" onclick="createWebhook()" class="btn btn-outline-primary">Create Webhook</button>
+    <button type="button" onclick="createWebhook()" class="btn btn-outline-primary">Create All Webhooks</button>
     <button type="button" onclick="loadWebhooks()" class="btn btn-outline-primary">Load Webhook</button>
     <button type="button" onclick="loadInvoices()" class="btn btn-outline-primary">Load Invoices</button>
 

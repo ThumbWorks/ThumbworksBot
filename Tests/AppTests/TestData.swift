@@ -52,10 +52,10 @@ class FreshbooksWebServicingMockWithDefaultHandlers: FreshbooksWebServicingMock 
         set {}
     }
 
-    override var registerNewWebhookHandler: ((String, String, Request) throws -> (EventLoopFuture<NewWebhookPayload>))? {
+    override var registerNewWebhookHandler: ((String, String, WebhookType, Client) throws -> (EventLoopFuture<NewWebhookPayload>))? {
         get {
 
-            return { _, _, request in
+            return { _, _, _, request in
                 let promise = request.eventLoop.makePromise(of: NewWebhookPayload.self)
                 DispatchQueue.global().async {
                     promise.succeed(TestData.newWebhookResponse)

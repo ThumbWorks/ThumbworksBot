@@ -136,7 +136,7 @@ struct AuthRequest: Content {
 }
 
 struct NewWebhookCallbackRequest: Content {
-    let event: String
+    let event: WebhookType
     let uri: String
 }
 

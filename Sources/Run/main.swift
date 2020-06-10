@@ -34,6 +34,7 @@ func generateDependencies() throws -> ApplicationDependencies {
                                    slackServicing: slackServicing,
                                    hostname: hostName,
                                    clientID: clientID,
+                                   clientSecret: clientSecret,
                                    databaseURLString: dbHost) { sessionID, request in
                                     // For the actual app, we use the userID that is passed from the request from freshbooks
                                     User.query(on: request.db)
