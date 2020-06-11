@@ -103,8 +103,8 @@ public class FreshbooksWebServicingMock: FreshbooksWebServicing {
     }
 
     public var confirmWebhookCallCount = 0
-    public var confirmWebhookHandler: ((String, Request) throws -> (EventLoopFuture<ClientResponse>))?
-    public func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse> {
+    public var confirmWebhookHandler: ((String, Request) throws -> (EventLoopFuture<Void>))?
+    public func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<Void> {
         confirmWebhookCallCount += 1
         if let confirmWebhookHandler = confirmWebhookHandler {
             return try confirmWebhookHandler(accessToken, req)

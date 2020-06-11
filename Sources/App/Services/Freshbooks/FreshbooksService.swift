@@ -48,7 +48,7 @@ public protocol FreshbooksWebServicing {
     func fetchPayment(accountID: String, paymentID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<PaymentContent>
     func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserResponseObject>
     func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent>
-    func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse>
+    func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<Void>
     func auth(with code: String, on req: Request) throws -> EventLoopFuture<TokenExchangeResponse>
 }
 
@@ -101,7 +101,7 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
             .map { $0.response.result.invoice }
     }
 
-    public func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse> {
+    public func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<Void> {
         let client = req.client
         let payload = try req.content.decode(FreshbooksWebhookTriggeredContent.self)
         let url = URI.freshbooksCallbackURL(accountID: payload.accountID, objectID: payload.objectID)
@@ -114,6 +114,7 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
         return client.put(url, headers: provider.headers(), beforeSend: { request in
             try request.content.encode(FreshbookConfirmReadyPayload(callback: callback))
         })
+        .map { _ in Void() }
     }
 
     public func deleteWebhook(accountID: String, webhookID: Int, on req: Request) throws -> EventLoopFuture<Void> {

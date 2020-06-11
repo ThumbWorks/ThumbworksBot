@@ -169,7 +169,7 @@ class WebhookControllerTests: XCTestCase {
         // Verify that we are able to fetch the user from the database and the access token set is being sent to confirm webhook
         freshbooks.confirmWebhookHandler = { token, request in
             XCTAssertEqual(token, TestData.userAccessToken)
-            return request.successPromiseClientResponse()
+            return request.successPromiseVoid()
         }
 
         do {
