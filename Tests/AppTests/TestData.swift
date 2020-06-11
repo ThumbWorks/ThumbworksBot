@@ -94,6 +94,8 @@ struct TestData {
                                                                            accountID: "123")
     static let userAccessToken = "accessTokenOfUserSavedInDB"
 
+    static let freshbooksPaymentContent = PaymentContent(accountingSystemID: "accountingSystemID", updated: Date(), invoiceID: 12345, amount: PaymentContent.Amount(amount: "123.00", code: "USD"), clientID: 12345, visState: 1, logID: 1, note: "Some note", freshbooksID: 12345)
+
 
 
     static let newWebhookResponse: NewWebhookPayload = {
@@ -120,6 +122,14 @@ public extension Request {
             promise.succeed(response)
         }
         return promise.futureResult
+    }
+
+    func successPromisePaymentContent() -> EventLoopFuture<PaymentContent> {
+        let promise = eventLoop.makePromise(of: PaymentContent.self)
+               DispatchQueue.global().async {
+                   promise.succeed(TestData.freshbooksPaymentContent)
+               }
+               return promise.futureResult
     }
 }
 

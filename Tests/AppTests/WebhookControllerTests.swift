@@ -116,25 +116,32 @@ class WebhookControllerTests: XCTestCase {
     func testExecuteWebhookUpdateInvoice() throws {
         let req = Request(application: application, on: application.eventLoopGroup.next())
         let executeWebhookPayload = FreshbooksWebhookTriggeredContent(freshbooksUserID: 123,
-                                                                      name: WebhookType.invoiceUpdate.rawValue,
+                                                                      name: WebhookType.paymentCreate.rawValue,
                                                                       objectID: 123,
                                                                       verified: true,
                                                                       verifier: nil,
                                                                       accountID: TestData.business.accountID ?? "booo")
         try req.content.encode(executeWebhookPayload)
+        // setup fetch payment handler
+        freshbooks.fetchPaymentHandler = { accountID, paymentID, accessToken, request in
+            return request.successPromisePaymentContent()
+        }
 
-        _ = try webhookController.ready(req).flatMapError({ error -> EventLoopFuture<HTTPStatus> in
-            XCTFail("We should implment invoice update")
-            return req.eventLoop.makeSucceededFuture(.ok)
-        })
-        XCTAssertThrowsError(try webhookController.ready(req).wait())
-        XCTAssertEqual(slack.sendSlackPayloadCallCount, 0)
+        // setup slack handler
+        slack.sendSlackPayloadHandler = { string, emoji, request in
+//            expectedEmoji = emoji
+            XCTAssertEqual(string, "New payment landed: 123.00 USD")
+            return request.successPromiseAfterGlobalDispatchASync()
+        }
+
+        _ = try webhookController.ready(req).wait()
+        XCTAssertEqual(slack.sendSlackPayloadCallCount, 1)
     }
     
     func testSlackMessageGetsSentOnVerifiedWebhook() throws {
         let req = Request(application: application, on: application.eventLoopGroup.next())
         var expectedEmoji: Emoji? = Emoji.apple
-        var expectedSlackPayloadString: String = "New invoice created to Uber Technologies, Inc, for 123 USD"
+        var expectedSlackPayloadString: String = ""
         
         // set custom slack handler
         slack.sendSlackPayloadHandler = { string, emoji, request in

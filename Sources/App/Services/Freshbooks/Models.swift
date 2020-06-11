@@ -88,14 +88,55 @@ struct InvoicePackage: Content {
             let invoice: FreshbooksInvoiceContent
         }
     }
-
 }
+
+public struct PaymentPackage: Content { // public for now
+    let response: PaymentResult
+    struct PaymentResult: Content {
+        // Response is getting parsed.
+        let result: PaymentContentWrapper
+        struct PaymentContentWrapper: Content {
+            let payment: PaymentContent
+        }
+        enum CodingKeys: String, CodingKey {
+            case result = "result"
+        }
+    }
+}
+
+public struct PaymentContent: Content, Equatable {
+
+    var accountingSystemID: String
+    var updated: Date //"2016-09-28 21:00:46"
+    var invoiceID: Int
+    var amount: Amount
+    var clientID: Int
+    var visState: Int
+    var logID: Int
+    var note: String
+//    var date: Date //"2013-12-10"
+    var freshbooksID: Int
+
+    struct Amount: Content, Equatable {
+        let amount: String
+        let code: String
+    }
+    enum CodingKeys: String, CodingKey {
+        case amount, updated, note//, date
+        case accountingSystemID = "accounting_systemid"
+        case freshbooksID = "id"
+        case clientID = "clientid"
+        case visState = "vis_state"
+        case invoiceID = "invoiceid"
+        case logID = "logid"
+    }
+}
+
 struct InvoicesPackage: Content {
     let response: InvoicesResult
 
     struct InvoicesResult: Content {
         let result: InvoicesMetaDataContent
-
     }
 }
 public struct InvoicesMetaDataContent: Content {
@@ -145,6 +186,27 @@ enum FreshbooksError: Error {
     case unableToParseWebhookObject
 }
 
+
+public enum FreshbooksObjectType: String {
+    case invoice
+    case payment
+    case category
+    case expense
+    case item
+    case project
+    case service
+    case recurring
+    case timeEntry
+
+    func getURI(accountID: String) -> URI {
+        switch self {
+        case .invoice:
+            return URI.freshbooksInvoicesURL(accountID: accountID, page: nil)
+        default:
+            return URI.freshbooksInvoicesURL(accountID: "abc", page: nil)
+        }
+    }
+}
 
 public enum WebhookType: String, CaseIterable, Codable {
     case unknown

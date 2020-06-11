@@ -21,8 +21,13 @@ extension URI {
         }
         return URI(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/invoices/invoices")
     }
+
     static func freshbooksInvoiceURL(accountID: String, invoiceID: Int) -> URI {
         return URI(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/invoices/invoices/\(invoiceID)")
+    }
+
+    static func freshbooksPaymentURL(accountID: String, paymentID: Int) -> URI {
+        return URI(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/payments/payments/\(paymentID)")
     }
 
     static func freshbooksCallbackURL(accountID: String, objectID: Int) -> URI {
@@ -36,10 +41,12 @@ extension URI {
 
 /// @mockable
 public protocol FreshbooksWebServicing {
+//    func genericRequest(accountID: String, objectID: Int, objectType: FreshbooksObjectType, accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse>
     func deleteWebhook(accountID: String, webhookID: Int, on req: Request) throws -> EventLoopFuture<ClientResponse>
     func registerNewWebhook(accountID: String, accessToken: String, type: WebhookType, with client: Client) throws -> EventLoopFuture<NewWebhookPayload>
     func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult>
     func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent>
+    func fetchPayment(accountID: String, paymentID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<PaymentContent>
     func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserFetchResponsePayload>
     func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent>
     func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse>
@@ -81,17 +88,38 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
         self.clientSecret = clientSecret
     }
 
+//    public func genericRequest(accountID: String, objectID: Int, objectType: FreshbooksObjectType, accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse> {
+//        let provider = FreshbooksHeaderProvider(accessToken: accessToken)
+//        let client = req.client
+//        let url = objectType.getURI(accountID: accountID)
+//        let responsePayloadType = InvoicesPackage.self
+//        return client.get(url, headers: provider.headers())
+//        .flatMapThrowing { clientResponse in
+//            let result = try clientResponse.content.decode(responsePayloadType).response.result
+//            result.invoices.forEach {print($0.createdAt)}
+//            return clientResponse.content.decode(responsePayloadType).response.result
+//        }
+//    }
+
+    public func fetchPayment(accountID: String, paymentID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<PaymentContent> {
+        let provider = FreshbooksHeaderProvider(accessToken: accessToken)
+        let client = req.client
+        let url = URI.freshbooksPaymentURL(accountID: accountID, paymentID: paymentID)
+        return client.get(url, headers: provider.headers())
+            .flatMapThrowing { clientResponse in
+                // TODO better error handling here
+                let package = try clientResponse.content.decode(PaymentPackage.self).response.result.payment
+                return package
+        }
+    }
     // An attempt was made to add this call with a job
     public func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent> {
 
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
         let client = req.client
         let url = URI.freshbooksInvoicesURL(accountID: accountID, page: page)
-        print(url)
         return client.get(url, headers: provider.headers())
             .flatMapThrowing { clientResponse in
-                let result = try clientResponse.content.decode(InvoicesPackage.self).response.result
-                result.invoices.forEach {print($0.createdAt)}
                 return try clientResponse.content.decode(InvoicesPackage.self).response.result
         }
     }
