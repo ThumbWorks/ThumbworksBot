@@ -25,13 +25,13 @@ class FreshbooksWebServicingMockWithDefaultHandlers: FreshbooksWebServicingMock 
         }
     }
 
-    override var fetchUserHandler: ((String, Request) throws -> (EventLoopFuture<UserFetchResponsePayload>))? {
+    override var fetchUserHandler: ((String, Request) throws -> (EventLoopFuture<UserResponseObject>))? {
         get {
 
             return  { _, request in
-                let promise = request.eventLoop.makePromise(of: UserFetchResponsePayload.self)
+                let promise = request.eventLoop.makePromise(of: UserResponseObject.self)
                 DispatchQueue.global().async {
-                    promise.succeed(TestData.userFetchResponsePayload)
+                    promise.succeed(TestData.userFetchResponsePayload.response)
                 }
                 return promise.futureResult
             }
@@ -115,7 +115,15 @@ struct TestData {
 }
 
 public extension Request {
-    func successPromiseAfterGlobalDispatchASync() -> EventLoopFuture<ClientResponse> {
+    func successPromiseVoid() -> EventLoopFuture<Void> {
+        let promise = eventLoop.makePromise(of: Void.self)
+        DispatchQueue.global().async {
+            promise.succeed(Void())
+        }
+        return promise.futureResult
+    }
+
+    func successPromiseClientResponse() -> EventLoopFuture<ClientResponse> {
         let promise = eventLoop.makePromise(of: ClientResponse.self)
         DispatchQueue.global().async {
             let response = ClientResponse(status: .ok, headers: [:], body: nil)
@@ -123,7 +131,7 @@ public extension Request {
         }
         return promise.futureResult
     }
-
+    
     func successPromisePaymentContent() -> EventLoopFuture<PaymentContent> {
         let promise = eventLoop.makePromise(of: PaymentContent.self)
                DispatchQueue.global().async {

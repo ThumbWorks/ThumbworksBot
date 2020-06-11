@@ -131,7 +131,7 @@ class WebhookControllerTests: XCTestCase {
         slack.sendSlackPayloadHandler = { string, emoji, request in
 //            expectedEmoji = emoji
             XCTAssertEqual(string, "New payment landed: 123.00 USD")
-            return request.successPromiseAfterGlobalDispatchASync()
+            return request.successPromiseClientResponse()
         }
 
         _ = try webhookController.ready(req).wait()
@@ -147,7 +147,7 @@ class WebhookControllerTests: XCTestCase {
         slack.sendSlackPayloadHandler = { string, emoji, request in
             expectedEmoji = emoji
             expectedSlackPayloadString = string
-            return request.successPromiseAfterGlobalDispatchASync()
+            return request.successPromiseClientResponse()
         }
         
         try? req.content.encode(TestData.freshbooksVerifiedWebhookContent)
@@ -169,7 +169,7 @@ class WebhookControllerTests: XCTestCase {
         // Verify that we are able to fetch the user from the database and the access token set is being sent to confirm webhook
         freshbooks.confirmWebhookHandler = { token, request in
             XCTAssertEqual(token, TestData.userAccessToken)
-            return request.successPromiseAfterGlobalDispatchASync()
+            return request.successPromiseClientResponse()
         }
 
         do {
@@ -198,7 +198,7 @@ class WebhookControllerTests: XCTestCase {
         freshbooks.deleteWebhookHandler = { userID, webhookID, request in
             XCTAssertNotNil(TestData.business.accountID)
             XCTAssertEqual(TestData.business.accountID, userID)
-            return request.successPromiseAfterGlobalDispatchASync()
+            return request.successPromiseVoid()
         }
         let userAuthenticator = UserSessionAuthenticator(authenticationClosure: deps.authenticationClosure)
         _ = try userAuthenticator.authenticate(sessionID: TestData.userAccessToken, for: req).wait()

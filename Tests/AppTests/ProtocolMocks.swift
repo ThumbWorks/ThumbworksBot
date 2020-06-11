@@ -33,8 +33,8 @@ public class FreshbooksWebServicingMock: FreshbooksWebServicing {
 
 
     public var deleteWebhookCallCount = 0
-    public var deleteWebhookHandler: ((String, Int, Request) throws -> (EventLoopFuture<ClientResponse>))?
-    public func deleteWebhook(accountID: String, webhookID: Int, on req: Request) throws -> EventLoopFuture<ClientResponse> {
+    public var deleteWebhookHandler: ((String, Int, Request) throws -> (EventLoopFuture<Void>))?
+    public func deleteWebhook(accountID: String, webhookID: Int, on req: Request) throws -> EventLoopFuture<Void> {
         deleteWebhookCallCount += 1
         if let deleteWebhookHandler = deleteWebhookHandler {
             return try deleteWebhookHandler(accountID, webhookID, req)
@@ -83,8 +83,8 @@ public class FreshbooksWebServicingMock: FreshbooksWebServicing {
     }
 
     public var fetchUserCallCount = 0
-    public var fetchUserHandler: ((String, Request) throws -> (EventLoopFuture<UserFetchResponsePayload>))?
-    public func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserFetchResponsePayload> {
+    public var fetchUserHandler: ((String, Request) throws -> (EventLoopFuture<UserResponseObject>))?
+    public func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserResponseObject> {
         fetchUserCallCount += 1
         if let fetchUserHandler = fetchUserHandler {
             return try fetchUserHandler(accessToken, req)
