@@ -137,6 +137,9 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
                 // I noticed this when testing to fetch a random object_id that didn't exist we got a 1012 UnknownResource error
                 let errorPayload = try response.content.decode(ErrorResponse.self)
                 print(errorPayload.response.errors)
+                if errorPayload.response.errors.first?.errno == 1012 {
+                    throw FreshbooksError.invoiceNotFound
+                }
                 throw error
             }
         }

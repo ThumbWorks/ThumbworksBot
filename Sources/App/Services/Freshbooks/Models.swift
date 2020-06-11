@@ -179,11 +179,42 @@ struct TokenExchangeRequest: Content {
 }
 
 // Errors
-enum FreshbooksError: Error {
+enum FreshbooksError: AbortError {
+    var status: HTTPResponseStatus {
+        switch self {
+
+        case .invalidURL:
+            return .notFound
+        case .invoiceNotFound:
+            return .notFound
+        case .noAccessTokenFound:
+            return .unauthorized
+        case .noVerifierAttribute:
+            return .badRequest
+        case .unableToParseWebhookObject:
+            return .unprocessableEntity
+        }
+    }
+
     case invalidURL
+    case invoiceNotFound
     case noAccessTokenFound
     case noVerifierAttribute
     case unableToParseWebhookObject
+    var reason: String {
+        switch self {
+        case .invalidURL:
+            return "Invalid URL requested"
+        case .invoiceNotFound:
+            return "Invoice not Found"
+        case .noAccessTokenFound:
+            return "Not access token found"
+        case .noVerifierAttribute:
+            return "No verifier"
+        case .unableToParseWebhookObject:
+            return "Unable to parse Webhook"
+        }
+    }
 }
 
 
