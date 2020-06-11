@@ -88,40 +88,26 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
         self.clientSecret = clientSecret
     }
 
-//    public func genericRequest(accountID: String, objectID: Int, objectType: FreshbooksObjectType, accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse> {
-//        let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-//        let client = req.client
-//        let url = objectType.getURI(accountID: accountID)
-//        let responsePayloadType = InvoicesPackage.self
-//        return client.get(url, headers: provider.headers())
-//        .flatMapThrowing { clientResponse in
-//            let result = try clientResponse.content.decode(responsePayloadType).response.result
-//            result.invoices.forEach {print($0.createdAt)}
-//            return clientResponse.content.decode(responsePayloadType).response.result
-//        }
-//    }
+    /// Generic Request which should return an EventLoopFuture<T> where T is the top level json object returned from the response. Consumers of this API should map to the desired content
+    private func genericRequest<T: Content>(method: HTTPMethod, url: URI, headers:  HTTPHeaders, returnType: T.Type, on req: Request) throws -> EventLoopFuture<T> {
+        let client = req.client
+        return client.send(method, headers: headers, to: url)
+            .flatMapThrowing { clientResponse  in
+                return try clientResponse.content.decode(returnType.self)
+        }
+    }
 
     public func fetchPayment(accountID: String, paymentID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<PaymentContent> {
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-        let client = req.client
         let url = URI.freshbooksPaymentURL(accountID: accountID, paymentID: paymentID)
-        return client.get(url, headers: provider.headers())
-            .flatMapThrowing { clientResponse in
-                // TODO better error handling here
-                let package = try clientResponse.content.decode(PaymentPackage.self).response.result.payment
-                return package
-        }
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: PaymentPackage.self, on: req).map { $0.response.result.payment }
     }
+
     // An attempt was made to add this call with a job
     public func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent> {
-
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-        let client = req.client
         let url = URI.freshbooksInvoicesURL(accountID: accountID, page: page)
-        return client.get(url, headers: provider.headers())
-            .flatMapThrowing { clientResponse in
-                return try clientResponse.content.decode(InvoicesPackage.self).response.result
-        }
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: InvoicesPackage.self, on: req).map { $0.response.result }
     }
 
     struct ErrorResponse: Content {
