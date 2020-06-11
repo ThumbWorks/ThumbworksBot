@@ -41,24 +41,22 @@ final class FreshbooksController {
             do {
                 return try self.freshbooksService
                     .fetchUser(accessToken: tokenResponse.accessToken, on: req)
-                    .flatMap { userResponse -> EventLoopFuture<Void> in
-                        print(userResponse)
-                        let userID = userResponse.response.id
+                    .flatMap { userResponseObject -> EventLoopFuture<Void> in
                         return User.query(on: req.db)
-                            .filter(\.$freshbooksID, .equal, userID)
+                            .filter(\.$freshbooksID, .equal, userResponseObject.id)
                             .first()
                             .flatMap { user  in
                                 let savableUser: User
                                 if let user = user {
                                     // If yes, update
                                     savableUser = user
-                                    savableUser.updateUser(responseObject: userResponse.response, accessToken: tokenResponse.accessToken)
+                                    savableUser.updateUser(responseObject: userResponseObject, accessToken: tokenResponse.accessToken)
                                 } else {
                                     // If no, create
-                                    savableUser = User(responseObject: userResponse.response, accessToken: tokenResponse.accessToken)
+                                    savableUser = User(responseObject: userResponseObject, accessToken: tokenResponse.accessToken)
                                 }
                                 return savableUser.save(on: req.db).flatMapThrowing { Void  in
-                                    return try savableUser.addMemberships(from: userResponse.response, on: req)
+                                    return try savableUser.addMemberships(from: userResponseObject, on: req)
                                 }.flatMap { user in
                                     return self.userSessionAuthenticator.authenticate(sessionID: tokenResponse.accessToken, for: req)
                                 }
@@ -115,61 +113,5 @@ final class FreshbooksController {
                     return req.eventLoop.makeFailedFuture(error)
                 }
         }
-    }
-}
-
-// Mark network models
-
-struct UserFetchRequest: Content {
-    let accessToken: String
-    enum CodingKeys: String, CodingKey {
-        case accessToken = "access_token"
-    }
-}
-
-public struct UserFetchResponsePayload: Content {
-    let response: UserResponseObject
-}
-
-struct AuthRequest: Content {
-    let code: String
-}
-
-struct NewWebhookCallbackRequest: Content {
-    let event: WebhookType
-    let uri: String
-}
-
-struct CreateWebhookRequestPayload: Content {
-    var callback: NewWebhookCallbackRequest
-}
-
-struct UserResponseObject: Content {
-    let id: Int
-    let firstName: String
-    let lastName: String
-    let businessMemberships: [MembershipPayload]
-    enum CodingKeys: String, CodingKey {
-        case firstName = "first_name"
-        case lastName = "last_name"
-        case id
-        case businessMemberships = "business_memberships"
-    }
-}
-
-struct MembershipPayload: Content {
-
-    let id: Int
-    let role: String
-    let business: BusinessPayload
-}
-
-struct BusinessPayload: Content { // https://www.freshbooks.com/api/me_endpoint
-    let id: Int
-    let name: String
-    let accountID: String?
-    enum CodingKeys: String, CodingKey {
-        case id, name
-        case accountID = "account_id"
     }
 }

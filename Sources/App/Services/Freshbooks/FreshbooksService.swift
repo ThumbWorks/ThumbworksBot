@@ -47,7 +47,7 @@ public protocol FreshbooksWebServicing {
     func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult>
     func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent>
     func fetchPayment(accountID: String, paymentID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<PaymentContent>
-    func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserFetchResponsePayload>
+    func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserResponseObject>
     func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent>
     func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse>
     func auth(with code: String, on req: Request) throws -> EventLoopFuture<TokenExchangeResponse>
@@ -93,56 +93,41 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
         let client = req.client
         return client.send(method, headers: headers, to: url)
             .flatMapThrowing { clientResponse  in
-                return try clientResponse.content.decode(returnType.self)
+                do {
+                    return try clientResponse.content.decode(returnType.self)
+                } catch {
+                    // Just catching any errors here. These are documented at https://www.freshbooks.com/api/errors
+                    // I noticed this when testing to fetch a random object_id that didn't exist we got a 1012 UnknownResource error
+                    let errorPayload = try clientResponse.content.decode(ErrorResponse.self)
+                    print(errorPayload.response.errors)
+                    if errorPayload.response.errors.first?.errno == 1012 {
+                        throw FreshbooksError.invoiceNotFound
+                    }
+                    throw error
+                }
         }
     }
 
     public func fetchPayment(accountID: String, paymentID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<PaymentContent> {
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
         let url = URI.freshbooksPaymentURL(accountID: accountID, paymentID: paymentID)
-        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: PaymentPackage.self, on: req).map { $0.response.result.payment }
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: PaymentPackage.self, on: req)
+            .map { $0.response.result.payment }
     }
 
     // An attempt was made to add this call with a job
     public func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent> {
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
         let url = URI.freshbooksInvoicesURL(accountID: accountID, page: page)
-        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: InvoicesPackage.self, on: req).map { $0.response.result }
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: InvoicesPackage.self, on: req)
+            .map { $0.response.result }
     }
 
-    struct ErrorResponse: Content {
-        let response: ErrorResponseErrors
-        struct ErrorResponseErrors: Content {
-            let errors: [ErrorContent]
-        }
-        struct ErrorContent: Content {
-            let errno: Int
-            let field: String
-            let message: String
-            let object: String
-            let value: String
-        }
-    }
     public func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent> {
         let url = URI.freshbooksInvoiceURL(accountID: accountID, invoiceID: invoiceID)
-        let client = req.client
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-
-        return client.get(url, headers: provider.headers()).flatMapThrowing { response in
-            do {
-                let package = try response.content.decode(InvoicePackage.self)
-                return package.response.result.invoice
-            } catch {
-                // Just catching any errors here. These are documented at https://www.freshbooks.com/api/errors
-                // I noticed this when testing to fetch a random object_id that didn't exist we got a 1012 UnknownResource error
-                let errorPayload = try response.content.decode(ErrorResponse.self)
-                print(errorPayload.response.errors)
-                if errorPayload.response.errors.first?.errno == 1012 {
-                    throw FreshbooksError.invoiceNotFound
-                }
-                throw error
-            }
-        }
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: InvoicePackage.self, on: req)
+            .map { $0.response.result.invoice }
     }
 
     public func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<ClientResponse> {
@@ -154,6 +139,7 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
         }
         let callback = FreshbooksCallback(callbackID: payload.objectID, verifier: verifier)
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
+        
         return client.put(url, headers: provider.headers(), beforeSend: { request in
             try request.content.encode(FreshbookConfirmReadyPayload(callback: callback))
         })
@@ -186,11 +172,8 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
     public func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult> {
         let url = URI.freshbooksCallbacksURL(accountID: accountID)
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-
-        return req.client.get(url, headers: provider.headers())
-            .flatMapThrowing { response in
-                try response.content.decode(FreshbooksWebhookResponsePayload.self).response.result
-        }
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: FreshbooksWebhookResponsePayload.self, on: req)
+            .map { $0.response.result }
     }
 
     public func auth(with code: String, on req: Request) throws -> EventLoopFuture<TokenExchangeResponse> {
@@ -210,14 +193,11 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
         }
     }
 
-    public func fetchUser(accessToken: String, on req: Request)  throws ->  EventLoopFuture<UserFetchResponsePayload> {
+    public func fetchUser(accessToken: String, on req: Request)  throws ->  EventLoopFuture<UserResponseObject> {
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-
-        let userEndpoint = URI.freshbooksUser
-        return req.client.get(userEndpoint, headers: provider.headers())
-        .flatMapThrowing { clientResponse in
-            return try clientResponse.content.decode(UserFetchResponsePayload.self)
-        }
+        let url = URI.freshbooksUser
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: UserFetchResponsePayload.self, on: req)
+            .map { $0.response }
     }
 }
 

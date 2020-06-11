@@ -104,6 +104,20 @@ public struct PaymentPackage: Content { // public for now
     }
 }
 
+struct ErrorResponse: Content {
+    let response: ErrorResponseErrors
+    struct ErrorResponseErrors: Content {
+        let errors: [ErrorContent]
+    }
+    struct ErrorContent: Content {
+        let errno: Int
+        let field: String
+        let message: String
+        let object: String
+        let value: String
+    }
+}
+
 public struct PaymentContent: Content, Equatable {
 
     var accountingSystemID: String
@@ -288,4 +302,61 @@ public enum WebhookType: String, CaseIterable, Codable {
     case timeEntryCreate = "time_entry.create"
     case timeEntryDelete = "time_entry.delete"
     case timeEntryUpdate = "time_entry.update"
+}
+
+
+/// MARK: User Fetch Models
+
+struct UserFetchRequest: Content {
+    let accessToken: String
+    enum CodingKeys: String, CodingKey {
+        case accessToken = "access_token"
+    }
+}
+
+public struct UserFetchResponsePayload: Content {
+    let response: UserResponseObject
+}
+
+struct AuthRequest: Content {
+    let code: String
+}
+
+struct NewWebhookCallbackRequest: Content {
+    let event: WebhookType
+    let uri: String
+}
+
+struct CreateWebhookRequestPayload: Content {
+    var callback: NewWebhookCallbackRequest
+}
+
+public struct UserResponseObject: Content {
+    let id: Int
+    let firstName: String
+    let lastName: String
+    let businessMemberships: [MembershipPayload]
+    enum CodingKeys: String, CodingKey {
+        case firstName = "first_name"
+        case lastName = "last_name"
+        case id
+        case businessMemberships = "business_memberships"
+    }
+}
+
+struct MembershipPayload: Content {
+
+    let id: Int
+    let role: String
+    let business: BusinessPayload
+}
+
+struct BusinessPayload: Content { // https://www.freshbooks.com/api/me_endpoint
+    let id: Int
+    let name: String
+    let accountID: String?
+    enum CodingKeys: String, CodingKey {
+        case id, name
+        case accountID = "account_id"
+    }
 }
