@@ -254,30 +254,18 @@ extension WebhookController {
     }
 
     private func verifyWebhook(webhookID: Int, on req: Request) throws ->  EventLoopFuture<HTTPStatus> {
-
-
         return Webhook
             .query(on: req.db)
             .filter(\.$webhookID, .equal, webhookID)
             .first()
-            .flatMap { webhook in
+            .unwrap(or: WebhookError.webhookNotFound)
+            .flatMap { User.find($0.userID, on: req.db) }
+            .unwrap(or: WebhookError.orphanedWebhook)
+            .flatMap { user in
                 do {
-                    guard let webhook = webhook else { // TODO this can be simplified by unwrapping the EventLoopFuture
-                        throw WebhookError.webhookNotFound
-                    }
-                    return User.find(webhook.userID, on: req.db).flatMap { user in
-                        do {
-                            guard let user = user else { // TODO this can be simplified by unwrapping the EventLoopFuture
-                                throw WebhookError.orphanedWebhook
-                            }
-
-                            return try self.freshbooksService
-                                .confirmWebhook(accessToken: user.accessToken, on: req)
-                                .transform(to: .ok)
-                        } catch {
-                            return req.eventLoop.makeFailedFuture(error)
-                        }
-                    }
+                    return try self.freshbooksService
+                        .confirmWebhook(accessToken: user.accessToken, on: req)
+                        .transform(to: .ok)
                 } catch {
                     return req.eventLoop.makeFailedFuture(error)
                 }
