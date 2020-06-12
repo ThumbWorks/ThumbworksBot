@@ -95,10 +95,6 @@ final public  class WebhookController {
         }
     }
 
-    func getPayment(accountID: String, paymentID: Int, accessToken: String, on req: Request) throws -> EventLoopFuture<PaymentContent> {
-        return try freshbooksService.fetchPayment(accountID: accountID, paymentID: paymentID, accessToken: accessToken, req: req)
-    }
-
     func registerNewWebhook(_ req: Request) throws -> EventLoopFuture<HTTPStatus> {
         let user = try req.auth.require(User.self)
 
@@ -168,11 +164,6 @@ extension WebhookController {
         .unwrap(or: WebhookError.businessNotFound)
     }
 
-    private func newInvoiceSlackPayload(from content: FreshbooksInvoiceContent) -> (String, Emoji?) {
-        return ("New invoice created to \(content.currentOrganization), for \(content.amount.amount) \(content.amount.code)",
-            Emoji(rawValue: content.currentOrganization))
-    }
-
     private func sendToSlack(text: String, emoji: Emoji?, on req: Request) -> EventLoopFuture<HTTPStatus> {
         do {
             return try self.slackService.sendSlackPayload(text: text, with:emoji, on: req).transform(to: .ok)
@@ -205,47 +196,46 @@ extension WebhookController {
     }
 
     private func handleInvoicePayment(on req: Request) throws ->  EventLoopFuture<HTTPStatus> {
-          let triggeredPayload = try req.content.decode(FreshbooksWebhookTriggeredContent.self)
-          return getBusiness(with: triggeredPayload.accountID, on: req)
-              .flatMap { business  in
-                  let user = business.memberships.first?.user
-                  do {
-                      guard let user = user else {
-                          throw WebhookError.orphanedWebhook
-                      }
-                      return user.accountID(on: req)
-                          .unwrap(or: UserError.noAccountID)
-                          .flatMap { accountID in
-                              do {
-                                  let objectID = triggeredPayload.objectID
-                                  return try self.getPayment(accountID: accountID,
-                                                             paymentID: objectID,
-                                                             accessToken: user.accessToken,
-                                                             on: req)
-                                      .flatMap({ payment in
-                                          let text = "New payment landed: \(payment.amount.amount) \(payment.amount.code)"
-//                                          let emoji = Emoji(rawValue: invoice.currentOrganization)
-                                          do {
-                                              return try self.slackService.sendSlackPayload(text: text,
-                                                                                            with: nil,
-                                                                                            on: req)
-                                                .transform(to: .ok)
-                                          }
-                                          catch {
-                                              return req.eventLoop.makeFailedFuture(error)
-                                          }
-                                      })
-                              } catch {
-                                  return req.eventLoop.makeFailedFuture(error)
-                              }
-                      }
-                  } catch {
-                      return req.eventLoop.makeFailedFuture(error)
-                  }
-          }
-      }
+        let triggeredPayload = try req.content.decode(FreshbooksWebhookTriggeredContent.self)
+        return getBusiness(with: triggeredPayload.accountID, on: req)
+            .map { $0.memberships.first?.user}
+            .unwrap(or: WebhookError.orphanedWebhook)
+            .flatMap { user  in
+                return user.accountID(on: req)
+                    .unwrap(or: UserError.noAccountID)
+                    .flatMap { accountID in
+                        do {
+                            let objectID = triggeredPayload.objectID
+                            return try self.freshbooksService.fetchPayment(accountID: accountID, paymentID: objectID, accessToken: user.accessToken, req: req)
+                                .map { self.newPaymentSlackPayload(from: $0) }
+                                .flatMap { self.sendToSlack(text: $0, emoji: nil, on: req) }
+                        } catch {
+                            return req.eventLoop.makeFailedFuture(error)
+                        }
+                }
+        }
+    }
 
-
+    private func handleClientCreate(on req: Request) throws -> EventLoopFuture<HTTPStatus> {
+        let triggeredPayload = try req.content.decode(FreshbooksWebhookTriggeredContent.self)
+        return getBusiness(with: triggeredPayload.accountID, on: req)
+                   .map { $0.memberships.first?.user}
+                   .unwrap(or: WebhookError.orphanedWebhook)
+                   .flatMap { user  in
+                       return user.accountID(on: req)
+                           .unwrap(or: UserError.noAccountID)
+                           .flatMap { accountID in
+                               do {
+                                let objectID = triggeredPayload.objectID
+                                return try self.freshbooksService.fetchClient(accountID: accountID, clientID: objectID, accessToken: user.accessToken, req: req)
+                                    .map { self.newClientSlackPayload(from: $0) }
+                                    .flatMap { self.sendToSlack(text: $0, emoji: $1, on: req) }
+                               } catch {
+                                   return req.eventLoop.makeFailedFuture(error)
+                               }
+                       }
+               }
+    }
     private func executeWebhook(on req: Request) throws ->  EventLoopFuture<HTTPStatus> {
         let triggeredPayload = try req.content.decode(FreshbooksWebhookTriggeredContent.self)
         let type = WebhookType(rawValue: triggeredPayload.name)
@@ -254,6 +244,8 @@ extension WebhookController {
             return try handleInvoiceCreate(on: req)
         case .paymentCreate:
             return try handleInvoicePayment(on: req)
+        case .clientCreate:
+            return try handleClientCreate(on: req)
 
         default:
             let error = WebhookError.unknown("unimplemented freshbooks event handler")
@@ -291,6 +283,23 @@ extension WebhookController {
                 }
         }
     }
+}
+
+// MARK: - Slack Payload Generators
+extension WebhookController {
+    private func newInvoiceSlackPayload(from content: FreshbooksInvoiceContent) -> (String, Emoji?) {
+        return ("New invoice created to \(content.currentOrganization), for \(content.amount.amount) \(content.amount.code)",
+            Emoji(rawValue: content.currentOrganization))
+    }
+
+    private func newPaymentSlackPayload(from content: PaymentContent) -> String {
+        return ("New payment landed: \(content.amount.amount) \(content.amount.code)")
+    }
+
+    private func newClientSlackPayload(from content: ClientContent) -> (String, Emoji?) {
+        return ("New client added: \(content.organization)", Emoji(rawValue: content.organization))
+    }
+
 }
 
 extension User {

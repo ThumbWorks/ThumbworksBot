@@ -10,7 +10,7 @@ import Vapor
 public enum Emoji: String {
     case uber = "Uber Technologies, Inc"
     case lohi = "Lohi Labs"
-    case apple
+    case apple = "Apple"
 
     var symbol: String {
         get {

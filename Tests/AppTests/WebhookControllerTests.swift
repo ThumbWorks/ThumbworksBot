@@ -113,7 +113,7 @@ class WebhookControllerTests: XCTestCase {
         }
     }
 
-    func testExecuteWebhookUpdateInvoice() throws {
+    func testExecuteWebhookNewPayment() throws {
         let req = Request(application: application, on: application.eventLoopGroup.next())
         let executeWebhookPayload = FreshbooksWebhookTriggeredContent(freshbooksUserID: 123,
                                                                       name: WebhookType.paymentCreate.rawValue,
@@ -129,7 +129,6 @@ class WebhookControllerTests: XCTestCase {
 
         // setup slack handler
         slack.sendSlackPayloadHandler = { string, emoji, request in
-//            expectedEmoji = emoji
             XCTAssertEqual(string, "New payment landed: 123.00 USD")
             return request.successPromiseClientResponse()
         }
@@ -138,7 +137,7 @@ class WebhookControllerTests: XCTestCase {
         XCTAssertEqual(slack.sendSlackPayloadCallCount, 1)
     }
     
-    func testSlackMessageGetsSentOnVerifiedWebhook() throws {
+    func testExecuteWebhookNewInvoice() throws {
         let req = Request(application: application, on: application.eventLoopGroup.next())
         var expectedEmoji: Emoji? = Emoji.apple
         var expectedSlackPayloadString: String = ""
@@ -150,7 +149,7 @@ class WebhookControllerTests: XCTestCase {
             return request.successPromiseClientResponse()
         }
         
-        try? req.content.encode(TestData.freshbooksVerifiedWebhookContent)
+        try? req.content.encode(TestData.invoiceCreateWebhookContent)
         // Run the command
         XCTAssertEqual(try webhookController.ready(req).wait(), HTTPStatus.ok)
         
@@ -162,6 +161,35 @@ class WebhookControllerTests: XCTestCase {
         XCTAssertEqual(freshbooks.fetchInvoiceCallCount, 1)
 
     }
+
+    func testExecuteWebhookNewClient() throws {
+          let req = Request(application: application, on: application.eventLoopGroup.next())
+          var expectedEmoji: Emoji? = Emoji.apple
+          var expectedSlackPayloadString: String = ""
+
+          // set custom slack handler
+          slack.sendSlackPayloadHandler = { string, emoji, request in
+              expectedEmoji = emoji
+              expectedSlackPayloadString = string
+              return request.successPromiseClientResponse()
+          }
+
+
+        freshbooks.fetchClientHandler = { _, _, _, request in
+            return request.successPromiseClientContentResponse()
+        }
+        try? req.content.encode(TestData.clientCreateWebhookContent)
+          // Run the command
+          XCTAssertEqual(try webhookController.ready(req).wait(), HTTPStatus.ok)
+
+          // validate the results
+          XCTAssertEqual(expectedEmoji, Emoji.apple)
+          XCTAssertEqual(expectedSlackPayloadString, "New client added: Apple")
+
+          XCTAssertEqual(slack.sendSlackPayloadCallCount, 1)
+          XCTAssertEqual(freshbooks.fetchClientCallCount, 1)
+
+      }
     
     func testFreshbooksVerificationWebhook() throws {
         let req = Request(application: application, on: application.eventLoopGroup.next())

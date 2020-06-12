@@ -30,6 +30,10 @@ extension URI {
         return URI(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/payments/payments/\(paymentID)")
     }
 
+    static func clientURL(accountID: String, clientID: Int) -> URI {
+        return URI(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/users/clients/\(clientID)")
+    }
+
     static func freshbooksCallbackURL(accountID: String, objectID: Int) -> URI {
         return URI(string: "\(String.freshbooksAPIHost)/events/account/\(accountID)/events/callbacks/\(objectID)")
     }
@@ -44,7 +48,8 @@ public protocol FreshbooksWebServicing {
     func deleteWebhook(accountID: String, webhookID: Int, on req: Request) throws -> EventLoopFuture<Void>
     func registerNewWebhook(accountID: String, accessToken: String, type: WebhookType, with client: Client) throws -> EventLoopFuture<NewWebhookPayload>
     func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult>
-    func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent>
+    func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent> // TODO rename the Freshbooks*Content types
+    func fetchClient(accountID: String, clientID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<ClientContent>
     func fetchPayment(accountID: String, paymentID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<PaymentContent>
     func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserResponseObject>
     func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent>
@@ -69,6 +74,7 @@ class FreshbooksHeaderProvider {
 // MARK: - FreshbooksWebServicing public facing
 public final class FreshbooksWebservice: FreshbooksWebServicing {
 
+
     let clientSecret: String
     let clientID: String
     let hostname: String
@@ -79,10 +85,17 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
         self.clientSecret = clientSecret
     }
 
+    public func fetchClient(accountID: String, clientID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<ClientContent> {
+        let provider = FreshbooksHeaderProvider(accessToken: accessToken)
+        let url = URI.clientURL(accountID: accountID, clientID: clientID)
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: ClientPayload.self, on: req)
+            .map { $0.response.result.client }
+    }
+
     public func fetchPayment(accountID: String, paymentID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<PaymentContent> {
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-        let url = URI.freshbooksPaymentURL(accountID: accountID, paymentID: paymentID)
-        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: PaymentPackage.self, on: req)
+        let url = URI.freshbooksPaymentURL(accountID: accountID, paymentID: paymentID) // TODO rename the freshbooks*URL
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: PaymentPackage.self, on: req) // TODO rename the Package ones to Payload
             .map { $0.response.result.payment }
     }
 

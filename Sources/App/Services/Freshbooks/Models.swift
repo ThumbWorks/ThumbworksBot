@@ -360,3 +360,59 @@ struct BusinessPayload: Content { // https://www.freshbooks.com/api/me_endpoint
         case accountID = "account_id"
     }
 }
+
+
+public struct FreshbooksInvoiceContent: Content, Equatable {
+    var freshbooksID: Int
+    var status: Int
+    var userID: Int?
+    var paymentStatus: String
+    var currentOrganization: String
+    var amount: Amount
+    var createdAt: Date
+
+    func invoice() -> Invoice {
+        let invoice = Invoice()
+        invoice.freshbooksID = freshbooksID
+        invoice.status = status
+        invoice.userID = userID
+        invoice.paymentStatus = paymentStatus
+        invoice.currentOrganization = currentOrganization
+        invoice.amount = amount.amount
+        invoice.amountCode = amount.code
+        invoice.createdAt = createdAt
+        return invoice
+    }
+    struct Amount: Content, Equatable {
+        let amount: String
+        let code: String
+    }
+    enum CodingKeys: String, CodingKey {
+        case status, amount, userID
+        case freshbooksID = "id"
+        case createdAt = "created_at"
+        case paymentStatus = "payment_status"
+        case currentOrganization = "current_organization"
+    }
+}
+
+
+public struct ClientPayload: Content {
+    let response: ClientPayloadResponse
+    struct ClientPayloadResponse: Content {
+        let result: ClientPayloadResult
+    }
+    struct ClientPayloadResult: Content {
+        let client: ClientContent
+    }
+}
+
+public struct ClientContent: Content, Equatable {
+    var freshbooksID: Int
+    var organization: String
+
+    enum CodingKeys: String, CodingKey {
+        case freshbooksID = "id"
+        case organization
+    }
+}

@@ -60,36 +60,3 @@ struct CreateInvoice: Migration {
            database.schema(Invoice.schema).delete()
        }
 }
-public struct FreshbooksInvoiceContent: Content, Equatable {
-    var freshbooksID: Int
-    var status: Int
-    var userID: Int?
-    var paymentStatus: String
-    var currentOrganization: String
-    var amount: Amount
-    var createdAt: Date
-
-    func invoice() -> Invoice {
-        let invoice = Invoice()
-        invoice.freshbooksID = freshbooksID
-        invoice.status = status
-        invoice.userID = userID
-        invoice.paymentStatus = paymentStatus
-        invoice.currentOrganization = currentOrganization
-        invoice.amount = amount.amount
-        invoice.amountCode = amount.code
-        invoice.createdAt = createdAt
-        return invoice
-    }
-    struct Amount: Content, Equatable {
-        let amount: String
-        let code: String
-    }
-    enum CodingKeys: String, CodingKey {
-        case status, amount, userID
-        case freshbooksID = "id"
-        case createdAt = "created_at"
-        case paymentStatus = "payment_status"
-        case currentOrganization = "current_organization"
-    }
-}

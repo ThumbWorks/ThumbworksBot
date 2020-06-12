@@ -72,6 +72,16 @@ public class FreshbooksWebServicingMock: FreshbooksWebServicing {
         fatalError("fetchInvoiceHandler returns can't have a default value thus its handler must be set")
     }
 
+    public var fetchClientCallCount = 0
+    public var fetchClientHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<ClientContent>))?
+    public func fetchClient(accountID: String, clientID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<ClientContent> {
+        fetchClientCallCount += 1
+        if let fetchClientHandler = fetchClientHandler {
+            return try fetchClientHandler(accountID, clientID, accessToken, req)
+        }
+        fatalError("fetchClientHandler returns can't have a default value thus its handler must be set")
+    }
+
     public var fetchPaymentCallCount = 0
     public var fetchPaymentHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<PaymentContent>))?
     public func fetchPayment(accountID: String, paymentID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<PaymentContent> {

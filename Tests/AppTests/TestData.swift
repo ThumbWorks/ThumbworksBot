@@ -80,12 +80,18 @@ struct TestData {
     static let business = BusinessPayload(id: 345, name: "Thumbworks", accountID: businessAccountID)
     static let membership = MembershipPayload(id: 123, role: "manager", business: business)
     static let userResponseObject = UserResponseObject(id: userAccountID, firstName: "rod", lastName: "campbell", businessMemberships: [membership])
-    static let freshbooksVerifiedWebhookContent = FreshbooksWebhookTriggeredContent(freshbooksUserID: 1,
-                                                                                    name: WebhookType.invoiceCreate.rawValue,
-                                                                                    objectID: 123,
-                                                                                    verified: true,
-                                                                                    verifier: nil,
-                                                                                    accountID: businessAccountID)
+    static let invoiceCreateWebhookContent = FreshbooksWebhookTriggeredContent(freshbooksUserID: 1,
+                                                                               name: WebhookType.invoiceCreate.rawValue,
+                                                                               objectID: 123,
+                                                                               verified: true,
+                                                                               verifier: nil,
+                                                                               accountID: businessAccountID)
+    static let clientCreateWebhookContent = FreshbooksWebhookTriggeredContent(freshbooksUserID: 1,
+                                                                               name: WebhookType.clientCreate.rawValue,
+                                                                               objectID: 123,
+                                                                               verified: true,
+                                                                               verifier: nil,
+                                                                               accountID: businessAccountID)
     static let freshbooksVerifyContent = FreshbooksWebhookTriggeredContent(freshbooksUserID: 1,
                                                                            name: WebhookType.invoiceCreate.rawValue,
                                                                            objectID: 123,
@@ -96,7 +102,7 @@ struct TestData {
 
     static let freshbooksPaymentContent = PaymentContent(accountingSystemID: "accountingSystemID", updated: Date(), invoiceID: 12345, amount: PaymentContent.Amount(amount: "123.00", code: "USD"), clientID: 12345, visState: 1, logID: 1, note: "Some note", freshbooksID: 12345)
 
-
+    static let clientContent = ClientContent(freshbooksID: 1234, organization: "Apple")
 
     static let newWebhookResponse: NewWebhookPayload = {
         let callback = NewWebhookPayload.NewWebhookPayloadResult.NewWebhookPayloadCallback(callbackid: 123)
@@ -138,6 +144,14 @@ public extension Request {
                    promise.succeed(TestData.freshbooksPaymentContent)
                }
                return promise.futureResult
+    }
+
+    func successPromiseClientContentResponse() -> EventLoopFuture<ClientContent> {
+        let promise = eventLoop.makePromise(of: ClientContent.self)
+        DispatchQueue.global().async {
+            promise.succeed(TestData.clientContent)
+        }
+        return promise.futureResult
     }
 }
 
