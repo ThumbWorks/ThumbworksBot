@@ -33,8 +33,6 @@ final public class User: Model {
     public init() {}
 
     init(responseObject: UserResponseObject, accessToken: String) {
-        // TODO add the businessMemberships to the user
-//        responseObject.businessMemberships.map { Membership(membershipPayload: $0, userID: UUID()) }
         freshbooksID = responseObject.id
         firstName = responseObject.firstName
         lastName = responseObject.lastName

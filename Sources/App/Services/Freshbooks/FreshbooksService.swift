@@ -10,35 +10,36 @@ import Vapor
 extension String {
     static let freshbooksAPIHost = "https://api.freshbooks.com"
 }
+
 extension URI {
     static let freshbooksAuth = URI(string: "\(String.freshbooksAPIHost)/auth/oauth/token")
 
     static let freshbooksUser = URI(string: "\(String.freshbooksAPIHost)/auth/api/v1/users/me")
 
-    static func freshbooksInvoicesURL(accountID: String, page: Int?) -> URI {
+    static func invoices(accountID: String, page: Int?) -> URI {
         if let page = page {
             return URI(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/invoices/invoices?page=\(page)")
         }
         return URI(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/invoices/invoices")
     }
 
-    static func freshbooksInvoiceURL(accountID: String, invoiceID: Int) -> URI {
+    static func invoice(accountID: String, invoiceID: Int) -> URI {
         return URI(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/invoices/invoices/\(invoiceID)")
     }
 
-    static func freshbooksPaymentURL(accountID: String, paymentID: Int) -> URI {
+    static func payment(accountID: String, paymentID: Int) -> URI {
         return URI(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/payments/payments/\(paymentID)")
     }
 
-    static func clientURL(accountID: String, clientID: Int) -> URI {
+    static func client(accountID: String, clientID: Int) -> URI {
         return URI(string: "\(String.freshbooksAPIHost)/accounting/account/\(accountID)/users/clients/\(clientID)")
     }
 
-    static func freshbooksCallbackURL(accountID: String, objectID: Int) -> URI {
+    static func eventCallback(accountID: String, objectID: Int) -> URI {
         return URI(string: "\(String.freshbooksAPIHost)/events/account/\(accountID)/events/callbacks/\(objectID)")
     }
 
-    static func freshbooksCallbacksURL(accountID: String) -> URI {
+    static func eventCallbacks(accountID: String) -> URI {
         return URI(string: "\(String.freshbooksAPIHost)/events/account/\(accountID)/events/callbacks")
     }
 }
@@ -46,9 +47,9 @@ extension URI {
 /// @mockable
 public protocol FreshbooksWebServicing {
     func deleteWebhook(accountID: String, webhookID: Int, on req: Request) throws -> EventLoopFuture<Void>
-    func registerNewWebhook(accountID: String, accessToken: String, type: WebhookType, with client: Client) throws -> EventLoopFuture<NewWebhookPayload>
-    func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult>
-    func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent> // TODO rename the Freshbooks*Content types
+    func registerNewWebhook(accountID: String, accessToken: String, type: WebhookType, with client: Client) throws -> EventLoopFuture<NewWebhookPayloadCallback>
+    func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<WebhookResponseResult>
+    func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<InvoiceContent>
     func fetchClient(accountID: String, clientID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<ClientContent>
     func fetchPayment(accountID: String, paymentID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<PaymentContent>
     func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserResponseObject>
@@ -87,14 +88,14 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
 
     public func fetchClient(accountID: String, clientID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<ClientContent> {
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-        let url = URI.clientURL(accountID: accountID, clientID: clientID)
+        let url = URI.client(accountID: accountID, clientID: clientID)
         return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: ClientPayload.self, on: req)
             .map { $0.response.result.client }
     }
 
     public func fetchPayment(accountID: String, paymentID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<PaymentContent> {
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-        let url = URI.freshbooksPaymentURL(accountID: accountID, paymentID: paymentID) // TODO rename the freshbooks*URL
+        let url = URI.payment(accountID: accountID, paymentID: paymentID) // TODO rename the freshbooks*URL
         return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: PaymentPackage.self, on: req) // TODO rename the Package ones to Payload
             .map { $0.response.result.payment }
     }
@@ -102,13 +103,13 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
     // An attempt was made to add this call with a job
     public func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent> {
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-        let url = URI.freshbooksInvoicesURL(accountID: accountID, page: page)
+        let url = URI.invoices(accountID: accountID, page: page)
         return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: InvoicesPackage.self, on: req)
             .map { $0.response.result }
     }
 
-    public func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent> {
-        let url = URI.freshbooksInvoiceURL(accountID: accountID, invoiceID: invoiceID)
+    public func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<InvoiceContent> {
+        let url = URI.invoice(accountID: accountID, invoiceID: invoiceID)
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
         return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: InvoicePackage.self, on: req)
             .map { $0.response.result.invoice }
@@ -117,7 +118,7 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
     public func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<Void> {
         let client = req.client
         let payload = try req.content.decode(FreshbooksWebhookTriggeredContent.self)
-        let url = URI.freshbooksCallbackURL(accountID: payload.accountID, objectID: payload.objectID)
+        let url = URI.eventCallback(accountID: payload.accountID, objectID: payload.objectID)
         guard let verifier = payload.verifier else {
             throw FreshbooksError.noVerifierAttribute
         }
@@ -135,29 +136,27 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
         guard let accessToken = req.session.data["accessToken"] else {
             throw UserError.noAccessToken
         }
-        let url = URI.freshbooksCallbackURL(accountID: accountID, objectID: webhookID)
+        let url = URI.eventCallback(accountID: accountID, objectID: webhookID)
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
         return client.delete(url, headers: provider.headers()).map { _ in Void() }
     }
 
-    public func registerNewWebhook(accountID: String, accessToken: String, type: WebhookType, with client: Client) throws -> EventLoopFuture<NewWebhookPayload> {
+    public func registerNewWebhook(accountID: String, accessToken: String, type: WebhookType, with client: Client) throws -> EventLoopFuture<NewWebhookPayloadCallback> {
         let callback = NewWebhookCallbackRequest(event: type, uri: "\(hostname)/webhooks/ready")
         let requestPayload = CreateWebhookRequestPayload(callback: callback)
-        let url = URI.freshbooksCallbacksURL(accountID: accountID)
+        let url = URI.eventCallbacks(accountID: accountID)
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
         return client.post(url, headers: provider.headers()) { webhookRequest in
             try webhookRequest.content.encode(requestPayload)
-        }.flatMapThrowing {  response -> NewWebhookPayload in
-            // TODO we could afford some better error handling here. Attemping to register a webhook after it's already been created gives a 422 and a different payload in the response
-            let decoded = try response.content.decode(NewWebhookPayload.self)
-            return decoded
+        }.flatMapThrowing {  response -> NewWebhookPayloadCallback in
+            try response.content.decode(NewWebhookPayload.self).response.result.callback
         }
     }
 
-    public func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult> {
-        let url = URI.freshbooksCallbacksURL(accountID: accountID)
+    public func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<WebhookResponseResult> {
+        let url = URI.eventCallbacks(accountID: accountID)
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: FreshbooksWebhookResponsePayload.self, on: req)
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: WebhookResponsePayload.self, on: req)
             .map { $0.response.result }
     }
 

@@ -11,10 +11,10 @@ import XCTVapor
 
 
 class FreshbooksWebServicingMockWithDefaultHandlers: FreshbooksWebServicingMock {
-    override var fetchInvoiceHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<FreshbooksInvoiceContent>))? {
+    override var fetchInvoiceHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<InvoiceContent>))? {
         get {
             return { _, _, _, request in
-                let promise = request.eventLoop.makePromise(of: FreshbooksInvoiceContent.self)
+                let promise = request.eventLoop.makePromise(of: InvoiceContent.self)
                 DispatchQueue.global().async {
                     promise.succeed(TestData.invoice)
                 }
@@ -52,11 +52,10 @@ class FreshbooksWebServicingMockWithDefaultHandlers: FreshbooksWebServicingMock 
         set {}
     }
 
-    override var registerNewWebhookHandler: ((String, String, WebhookType, Client) throws -> (EventLoopFuture<NewWebhookPayload>))? {
+    override var registerNewWebhookHandler: ((String, String, WebhookType, Client) throws -> (EventLoopFuture<NewWebhookPayloadCallback>))? {
         get {
-
             return { _, _, _, request in
-                let promise = request.eventLoop.makePromise(of: NewWebhookPayload.self)
+                let promise = request.eventLoop.makePromise(of: NewWebhookPayloadCallback.self)
                 DispatchQueue.global().async {
                     promise.succeed(TestData.newWebhookResponse)
                 }
@@ -71,11 +70,11 @@ struct TestData {
     static let userAccountID = 123
     static let businessAccountID = "xyz123"
     static let authRequest = AuthRequest(code: "dummyCode")
-    static let invoice = FreshbooksInvoiceContent(freshbooksID: 1,
+    static let invoice = InvoiceContent(freshbooksID: 1,
                                                   status: 2,
                                                   paymentStatus: "unpaid",
                                                   currentOrganization: Emoji.uber.rawValue,
-                                                  amount: FreshbooksInvoiceContent.Amount(amount: "123", code: "USD"),
+                                                  amount: InvoiceContent.Amount(amount: "123", code: "USD"),
                                                   createdAt: Date())
     static let business = BusinessPayload(id: 345, name: "Thumbworks", accountID: businessAccountID)
     static let membership = MembershipPayload(id: 123, role: "manager", business: business)
@@ -104,12 +103,7 @@ struct TestData {
 
     static let clientContent = ClientContent(freshbooksID: 1234, organization: "Apple")
 
-    static let newWebhookResponse: NewWebhookPayload = {
-        let callback = NewWebhookPayload.NewWebhookPayloadResult.NewWebhookPayloadCallback(callbackid: 123)
-        let result = NewWebhookPayload.NewWebhookPayloadResult(callback: callback)
-        let response = NewWebhookPayload.NewWebhookPayloadResponse(result: result)
-        return NewWebhookPayload(response: response)
-    }()
+    static let newWebhookResponse = NewWebhookPayloadCallback(callbackid: 123)
 
     static let tokenExchangeResponse = TokenExchangeResponse(accessToken: userAccessToken,
                                                              tokenType: "",

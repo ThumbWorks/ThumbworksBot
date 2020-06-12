@@ -43,8 +43,8 @@ public class FreshbooksWebServicingMock: FreshbooksWebServicing {
     }
 
     public var registerNewWebhookCallCount = 0
-    public var registerNewWebhookHandler: ((String, String, WebhookType, Client) throws -> (EventLoopFuture<NewWebhookPayload>))?
-    public func registerNewWebhook(accountID: String, accessToken: String, type: WebhookType, with client: Client) throws -> EventLoopFuture<NewWebhookPayload> {
+    public var registerNewWebhookHandler: ((String, String, WebhookType, Client) throws -> (EventLoopFuture<NewWebhookPayloadCallback>))?
+    public func registerNewWebhook(accountID: String, accessToken: String, type: WebhookType, with client: Client) throws -> EventLoopFuture<NewWebhookPayloadCallback> {
         registerNewWebhookCallCount += 1
         if let registerNewWebhookHandler = registerNewWebhookHandler {
             return try registerNewWebhookHandler(accountID, accessToken, type, client)
@@ -53,8 +53,8 @@ public class FreshbooksWebServicingMock: FreshbooksWebServicing {
     }
 
     public var fetchWebhooksCallCount = 0
-    public var fetchWebhooksHandler: ((String, String, Request) throws -> (EventLoopFuture<FreshbooksWebhookResponseResult>))?
-    public func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult> {
+    public var fetchWebhooksHandler: ((String, String, Request) throws -> (EventLoopFuture<WebhookResponseResult>))?
+    public func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<WebhookResponseResult> {
         fetchWebhooksCallCount += 1
         if let fetchWebhooksHandler = fetchWebhooksHandler {
             return try fetchWebhooksHandler(accountID, accessToken, req)
@@ -63,8 +63,8 @@ public class FreshbooksWebServicingMock: FreshbooksWebServicing {
     }
 
     public var fetchInvoiceCallCount = 0
-    public var fetchInvoiceHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<FreshbooksInvoiceContent>))?
-    public func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<FreshbooksInvoiceContent> {
+    public var fetchInvoiceHandler: ((String, Int, String, Request) throws -> (EventLoopFuture<InvoiceContent>))?
+    public func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<InvoiceContent> {
         fetchInvoiceCallCount += 1
         if let fetchInvoiceHandler = fetchInvoiceHandler {
             return try fetchInvoiceHandler(accountID, invoiceID, accessToken, req)

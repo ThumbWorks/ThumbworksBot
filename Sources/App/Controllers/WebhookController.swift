@@ -132,7 +132,7 @@ final public  class WebhookController {
     }
 
     /// JSON describing the user's webhooks
-    func allWebhooks(_ req: Request) throws -> EventLoopFuture<FreshbooksWebhookResponseResult> {
+    func allWebhooks(_ req: Request) throws -> EventLoopFuture<WebhookResponseResult> {
         let user = try req.auth.require(User.self)
         let accessToken = user.accessToken
         return Business
@@ -254,20 +254,20 @@ extension WebhookController {
     }
 
     private func verifyWebhook(webhookID: Int, on req: Request) throws ->  EventLoopFuture<HTTPStatus> {
-        //        return Webhook.query(on: req.db).filter(\.webhookID == webhookID).first().flatMap { webhook in
-        // TODO need to figure out how to filter queries
+
+
         return Webhook
             .query(on: req.db)
             .filter(\.$webhookID, .equal, webhookID)
             .first()
             .flatMap { webhook in
                 do {
-                    guard let webhook = webhook else {
+                    guard let webhook = webhook else { // TODO this can be simplified by unwrapping the EventLoopFuture
                         throw WebhookError.webhookNotFound
                     }
                     return User.find(webhook.userID, on: req.db).flatMap { user in
                         do {
-                            guard let user = user else {
+                            guard let user = user else { // TODO this can be simplified by unwrapping the EventLoopFuture
                                 throw WebhookError.orphanedWebhook
                             }
 
@@ -287,7 +287,7 @@ extension WebhookController {
 
 // MARK: - Slack Payload Generators
 extension WebhookController {
-    private func newInvoiceSlackPayload(from content: FreshbooksInvoiceContent) -> (String, Emoji?) {
+    private func newInvoiceSlackPayload(from content: InvoiceContent) -> (String, Emoji?) {
         return ("New invoice created to \(content.currentOrganization), for \(content.amount.amount) \(content.amount.code)",
             Emoji(rawValue: content.currentOrganization))
     }
@@ -340,9 +340,9 @@ struct RegisterWebhookJob: Job {
                                                   accessToken: payload.accessToken,
                                                   type: payload.type,
                                                   with: context.application.client)
-                .flatMap({ payload -> EventLoopFuture<Void> in
+                .flatMap({ callback -> EventLoopFuture<Void> in
                     do {
-                        let callbackID = payload.response.result.callback.callbackid
+                        let callbackID = callback.callbackid
                         return Webhook(webhookID: callbackID, userID: try user.requireID())
                             .save(on: context.application.db)
                     } catch {

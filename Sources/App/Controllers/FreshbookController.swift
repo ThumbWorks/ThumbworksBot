@@ -79,7 +79,7 @@ final class FreshbooksController {
                         throw UserError.noAccessToken
                     }
                     
-                    let saveIncrementalsClosure: ([FreshbooksInvoiceContent]) -> () = { invoiceContents in
+                    let saveIncrementalsClosure: ([InvoiceContent]) -> () = { invoiceContents in
                         invoiceContents.forEach { content in
                             print("saving \(content.freshbooksID) from \(content.createdAt)")
                             let invoice = content.invoice()
@@ -99,7 +99,7 @@ final class FreshbooksController {
         }
     }
 
-    private func recursiveFetchInvoices(page: Int, accountID: String, accessToken: String, onIncremental: @escaping ([FreshbooksInvoiceContent]) -> (), on req: Request) throws -> EventLoopFuture<[FreshbooksInvoiceContent]>  {
+    private func recursiveFetchInvoices(page: Int, accountID: String, accessToken: String, onIncremental: @escaping ([InvoiceContent]) -> (), on req: Request) throws -> EventLoopFuture<[InvoiceContent]>  {
         return try self.freshbooksService
             .fetchInvoices(accountID: accountID, accessToken: accessToken, page: page, on: req).flatMap { metaData in
                 let theseInvoices = req.eventLoop.makeSucceededFuture(metaData.invoices)

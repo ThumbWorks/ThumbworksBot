@@ -15,10 +15,11 @@ public struct NewWebhookPayload: Content {
     }
     struct NewWebhookPayloadResult: Content {
         let callback: NewWebhookPayloadCallback
-        struct NewWebhookPayloadCallback: Content {
-            let callbackid: Int
-        }
+
     }
+}
+public struct NewWebhookPayloadCallback: Content {
+    let callbackid: Int
 }
 
 struct FreshbookConfirmReadyPayload: Content {
@@ -51,20 +52,19 @@ struct FreshbooksWebhookTriggeredContent: Content {
     }
 }
 
-struct FreshbooksWebhookResponsePayload: Codable, Content {
-    let response: FreshbooksWebhookResponseResponse
-
+struct WebhookResponsePayload: Codable, Content {
+    let response: WebhookResponseResponse
 }
 
-struct FreshbooksWebhookResponseResponse: Codable, Content {
-    let result: FreshbooksWebhookResponseResult
+struct WebhookResponseResponse: Codable, Content {
+    let result: WebhookResponseResult
 }
 
-public struct FreshbooksWebhookResponseResult: Codable, Content {
+public struct WebhookResponseResult: Codable, Content {
     let perPage: Int
     let pages: Int
     let page: Int
-    let callbacks: [FreshbooksWebhookCallbackResponse]
+    let callbacks: [WebhookCallbackResponse]
     enum CodingKeys: String, CodingKey {
         case perPage = "per_page"
         case pages, page
@@ -72,7 +72,7 @@ public struct FreshbooksWebhookResponseResult: Codable, Content {
     }
 }
 
-public struct FreshbooksWebhookCallbackResponse: Codable, Content {
+public struct WebhookCallbackResponse: Codable, Content {
     let callbackid: Int
     let verified: Bool
     let uri: String
@@ -85,7 +85,7 @@ struct InvoicePackage: Content {
     struct InvoiceResponse: Content {
         let result: InvoiceContainer
         struct InvoiceContainer: Content {
-            let invoice: FreshbooksInvoiceContent
+            let invoice: InvoiceContent
         }
     }
 }
@@ -156,7 +156,7 @@ struct InvoicesPackage: Content {
 public struct InvoicesMetaDataContent: Content {
     let pages: Int
     let page: Int
-    let invoices: [FreshbooksInvoiceContent]
+    let invoices: [InvoiceContent]
 }
 
 public struct TokenExchangeResponse: Content {
@@ -246,9 +246,9 @@ public enum FreshbooksObjectType: String {
     func getURI(accountID: String) -> URI {
         switch self {
         case .invoice:
-            return URI.freshbooksInvoicesURL(accountID: accountID, page: nil)
+            return URI.invoices(accountID: accountID, page: nil)
         default:
-            return URI.freshbooksInvoicesURL(accountID: "abc", page: nil)
+            return URI.invoices(accountID: "abc", page: nil)
         }
     }
 }
@@ -362,7 +362,7 @@ struct BusinessPayload: Content { // https://www.freshbooks.com/api/me_endpoint
 }
 
 
-public struct FreshbooksInvoiceContent: Content, Equatable {
+public struct InvoiceContent: Content, Equatable {
     var freshbooksID: Int
     var status: Int
     var userID: Int?

@@ -10,7 +10,7 @@ import Fluent
 import FluentPostgresDriver   
 
 final class Webhook: Model, Codable {
-    static var schema: String = "webhooks" // TODO upgrade to v4, /shrug
+    static var schema: String = "webhooks"
 
     init() {}
 
