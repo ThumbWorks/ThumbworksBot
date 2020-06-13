@@ -28,12 +28,10 @@ public enum Emoji: String {
 /// @mockable
 public protocol SlackWebServicing {
     func sendSlackPayload(text: String, with emoji: Emoji?, on req: Request) throws -> EventLoopFuture<ClientResponse>
-    var req: Request? { get set }
 }
 
 public final class SlackWebService: SlackWebServicing {
     let slackURL: URI
-    public var req: Request? // todo maybe i can get rid of this
 
     public init(slackURL: URI) {
         self.slackURL = slackURL

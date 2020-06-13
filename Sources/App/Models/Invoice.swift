@@ -3,7 +3,7 @@ import Fluent
 
 final class Invoice: Model, Equatable, Content {
     static func == (lhs: Invoice, rhs: Invoice) -> Bool {
-        return lhs.freshbooksID == rhs.freshbooksID // TODO upgrade to v4
+        return lhs.freshbooksID == rhs.freshbooksID
     }
 
     static var schema: String = "invoices"

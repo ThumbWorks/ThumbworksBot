@@ -10,9 +10,7 @@ import Vapor
 
 public class SlackWebServicingMock: SlackWebServicing {
     public init() { }
-    public init(req: Request? = nil) {
-        self.req = req
-    }
+
 
     public var sendSlackPayloadCallCount = 0
     public var sendSlackPayloadHandler: ((String, Emoji?, Request) throws -> (EventLoopFuture<ClientResponse>))?
@@ -23,9 +21,6 @@ public class SlackWebServicingMock: SlackWebServicing {
         }
         fatalError("sendSlackPayloadHandler returns can't have a default value thus its handler must be set")
     }
-
-    public var reqSetCallCount = 0
-    public var req: Request? = nil { didSet { reqSetCallCount += 1 } }
 }
 
 public class FreshbooksWebServicingMock: FreshbooksWebServicing {
@@ -53,11 +48,11 @@ public class FreshbooksWebServicingMock: FreshbooksWebServicing {
     }
 
     public var fetchWebhooksCallCount = 0
-    public var fetchWebhooksHandler: ((String, String, Request) throws -> (EventLoopFuture<WebhookResponseResult>))?
-    public func fetchWebhooks(accountID: String, accessToken: String, req: Request) throws -> EventLoopFuture<WebhookResponseResult> {
+    public var fetchWebhooksHandler: ((String, String, Int, Request) throws -> (EventLoopFuture<WebhookResponseResult>))?
+    public func fetchWebhooks(accountID: String, accessToken: String, page: Int, req: Request) throws -> EventLoopFuture<WebhookResponseResult> {
         fetchWebhooksCallCount += 1
         if let fetchWebhooksHandler = fetchWebhooksHandler {
-            return try fetchWebhooksHandler(accountID, accessToken, req)
+            return try fetchWebhooksHandler(accountID, accessToken, page, req)
         }
         fatalError("fetchWebhooksHandler returns can't have a default value thus its handler must be set")
     }

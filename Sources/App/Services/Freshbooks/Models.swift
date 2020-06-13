@@ -90,7 +90,7 @@ struct InvoicePackage: Content {
     }
 }
 
-public struct PaymentPackage: Content { // public for now
+public struct PaymentPayload: Content { // public for now
     let response: PaymentResult
     struct PaymentResult: Content {
         // Response is getting parsed.

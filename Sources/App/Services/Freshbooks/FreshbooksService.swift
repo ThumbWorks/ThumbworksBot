@@ -98,8 +98,8 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
 
     public func fetchPayment(accountID: String, paymentID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<PaymentContent> {
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-        let url = URI.payment(accountID: accountID, paymentID: paymentID) // TODO rename the freshbooks*URL
-        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: PaymentPackage.self, on: req) // TODO rename the Package ones to Payload
+        let url = URI.payment(accountID: accountID, paymentID: paymentID)
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: PaymentPayload.self, on: req) 
             .map { $0.response.result.payment }
     }
 
