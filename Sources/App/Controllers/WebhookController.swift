@@ -7,6 +7,25 @@
 
 import Vapor
 import Fluent
+
+enum BusinessError: AbortError {
+    var reason: String {
+        switch self {
+        case .businessNotFound:
+            return "Business not found"
+        }
+    }
+
+    var status: HTTPResponseStatus {
+        switch self {
+        case .businessNotFound:
+            return .notFound
+        }
+    }
+
+    case businessNotFound
+}
+
 enum UserError: Error {
     case noUserWithThatAccessToken
     case noAccessToken
@@ -71,24 +90,22 @@ final public  class WebhookController {
         let id: Int
     }
 
-    func deleteWebhook(_ req: Request) throws -> EventLoopFuture<HTTPStatus> {
+    func deleteWebhook(_ req: Request) throws -> EventLoopFuture<Response> {
         let user = try req.auth.require(User.self)
+        let webhookID = try req.query.decode(DeleteWebhookRequestPayload.self).id
 
         return user.accountID(on: req)
             .unwrap(or: UserError.noAccountID)
             .flatMap { accountID in
                 do {
-                    let webhookID = try req.query.decode(DeleteWebhookRequestPayload.self).id
                     return try self.freshbooksService.deleteWebhook(accountID: accountID, webhookID: webhookID, on: req)
-                        .flatMap({ response in
+                        .flatMap { _ in
                             Webhook.query(on: req.db)
                                 .filter(\.$webhookID, .equal, webhookID)
                                 .first()
                                 .unwrap(or: WebhookError.webhookNotFound)
-                                .flatMap { webhook in
-                                    webhook.delete(on: req.db)
-                            }
-                        }).transform(to: .ok)
+                                .flatMap { $0.delete(on: req.db) }
+                    }.transform(to: req.redirect(to: "/webhooks"))
                 } catch {
                     return req.eventLoop.makeFailedFuture(error)
                 }
@@ -97,32 +114,22 @@ final public  class WebhookController {
 
     func registerNewWebhook(_ req: Request) throws -> EventLoopFuture<HTTPStatus> {
         let user = try req.auth.require(User.self)
-
+        let accessToken = user.accessToken
         return user.accountID(on: req)
             .unwrap(or: UserError.noAccountID)
             .flatMap { accountID in
-                do {
-                    guard let accessToken = req.session.data["accessToken"] else {
-                        throw UserError.noAccessToken
-                    }
-
-                    _ = WebhookType.allCases.forEach { type in
-                        print("Queuing request to create \(type)")
-                        _ = req.queue.dispatch(RegisterWebhookJob.self,
-                                               .init(accountID: accountID,
-                                                     accessToken: accessToken,
-                                                     type: type,
-                                                     hostName: self.hostName,
-                                                     clientID: self.clientID,
-                                                     clientSecret: self.clientSecret,
-                                                     user: user)
-                        )
-                    }
-                    return req.eventLoop.makeSucceededFuture(.ok)
-
-                } catch {
-                    return req.eventLoop.makeFailedFuture(error)
+                WebhookType.allCases.forEach { type in
+                    print("Queuing request to create \(type)")
+                    let payload = RegisterWebhookPayload.init(accountID: accountID,
+                                                              accessToken: accessToken,
+                                                              type: type,
+                                                              hostName: self.hostName,
+                                                              clientID: self.clientID,
+                                                              clientSecret: self.clientSecret,
+                                                              user: user)
+                    _ = req.queue.dispatch(RegisterWebhookJob.self, payload)
                 }
+                return req.eventLoop.makeSucceededFuture(.ok)
         }
     }
 
@@ -131,6 +138,9 @@ final public  class WebhookController {
         return req.view.render("UserWebhooks")
     }
 
+    struct WebhookRequestPayload: Content {
+        let page: Int?
+    }
     /// JSON describing the user's webhooks
     func allWebhooks(_ req: Request) throws -> EventLoopFuture<WebhookResponseResult> {
         let user = try req.auth.require(User.self)
@@ -140,13 +150,14 @@ final public  class WebhookController {
             .filter(\.$accountID, .notEqual, nil)
             .first()
             .unwrap(or: Abort(.notFound))
-            .flatMap { business in
-                guard let accountID = business.accountID else {
-                    return req.eventLoop.makeFailedFuture(Abort(.notFound))
-                }
+            .map { $0.accountID }
+            .unwrap(or: BusinessError.businessNotFound)
+            .flatMap { accountID in
                 do {
+                    let page = try req.query.decode(WebhookRequestPayload.self).page ?? 1
                     return try self.freshbooksService.fetchWebhooks(accountID: accountID,
                                                                     accessToken: accessToken,
+                                                                    page: page,
                                                                     req: req)
                 } catch {
                     return req.eventLoop.makeFailedFuture(error)

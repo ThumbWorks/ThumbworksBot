@@ -10,9 +10,45 @@
                 loadWebhooks();
             })
         }
-        function loadWebhooks() {
+
+        function removeRowsFromWebhookTable() {
+            var table = document.getElementById('webhookTable');
+            var rows = table.getElementsByTagName('tr');
+            var rowCount = rows.length;
+
+            for (var x=rowCount-1; x>0; x--) {
+                table.removeChild(rows[x]);
+            }
+        }
+
+        function removePreviousAndNextButtons() {
+            let nextButton = document.getElementById("nextButton")
+            if (nextButton) {
+                document.getElementById("nextButtonDiv").removeChild(nextButton)
+            }
+            var previousButton = document.getElementById("previousButton")
+            if (previousButton) {
+                document.getElementById("previousButtonDiv").removeChild(previousButton)
+            }
+        }
+
+        function makeButton(title, buttonId, pageToLoad) {
+            var button = document.createElement('button');
+            button.id = buttonId
+            button.innerHTML = title;
+            button.type = "button"
+            button.class = "btn btn-outline-primary"
+            button.onclick = function(){
+                removeRowsFromWebhookTable()
+                removePreviousAndNextButtons()
+                loadWebhooks(pageToLoad)
+            };  
+            return button
+        }
+
+        function loadWebhooks(page) {
         
-            fetch('/allWebhooks', {
+            fetch('/allWebhooks?page=' + page, {
             headers: {
              'Content-Type': 'application/json'
             }
@@ -21,6 +57,19 @@
               return response.json();
             })
             .then((result) => {
+                // turn on or off the previous and next buttons
+                var totalPages = result["pages"]
+                var currentPage = result["page"]
+                var buttonDiv = document.getElementById("prevNextButtons");
+
+                if (currentPage > 1) {
+                    var button = makeButton("Previous", "previousButton", currentPage - 1)
+                    document.getElementById("previousButtonDiv").appendChild(button)   
+                }
+                if (currentPage < totalPages) {
+                    var button = makeButton("Next", "nextButton", currentPage + 1)
+                    document.getElementById("nextButtonDiv").appendChild(button)          
+                }
                 var webhooks = result["callbacks"]
                 console.log(webhooks)
                 for (i = 0; i < webhooks.length; i++) {
@@ -61,7 +110,7 @@
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
     </head>
 
-<body onload="loadWebhooks()">
+<body onload="loadWebhooks(1)">
     <div class="container-fluid" >
         
         <table class="table" id="webhookTable">
@@ -74,12 +123,15 @@
                     <th>delete</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="tableBody">
               
             </tbody>
         </table>
     </div>
-
+    <div class="container-fluid" id="prevNextButtons">
+        <div id="previousButtonDiv"></div>
+        <div id="nextButtonDiv"></div>
+    </div>
     <button type="button" onclick="createWebhook()" class="btn btn-outline-primary">Create All Webhooks</button>
     <button type="button" onclick="loadWebhooks()" class="btn btn-outline-primary">Load Webhook</button>
     <button type="button" onclick="loadInvoices()" class="btn btn-outline-primary">Load Invoices</button>

@@ -37,7 +37,6 @@ final class FreshbooksController {
         let codeContainer = try req.query.decode(AuthRequest.self)
         return try freshbooksService.auth(with: codeContainer.code, on: req)
             .flatMap({ (tokenResponse) -> EventLoopFuture<View> in
-            req.session.data["accessToken"] = tokenResponse.accessToken
             do {
                 return try self.freshbooksService
                     .fetchUser(accessToken: tokenResponse.accessToken, on: req)
@@ -70,15 +69,12 @@ final class FreshbooksController {
     }
 
     func getInvoices(_ req: Request) throws -> EventLoopFuture<HTTPStatus> {
+        // TODO this should probably be a job, if the payload suggests that there is more to be fetched, add a new job.
         let user = try req.auth.require(User.self)
         return user.accountID(on: req)
             .unwrap(or: UserError.noAccountID)
             .flatMap { accountID in
-                do {
-                    guard let accessToken = req.session.data["accessToken"] else {
-                        throw UserError.noAccessToken
-                    }
-                    
+                do {                    
                     let saveIncrementalsClosure: ([InvoiceContent]) -> () = { invoiceContents in
                         invoiceContents.forEach { content in
                             print("saving \(content.freshbooksID) from \(content.createdAt)")
@@ -88,7 +84,7 @@ final class FreshbooksController {
                     }
                     let recursiveResults = try self.recursiveFetchInvoices(page: 1,
                                                                            accountID: accountID,
-                                                                           accessToken: accessToken,
+                                                                           accessToken: user.accessToken,
                                                                            onIncremental: saveIncrementalsClosure,
                                                                            on: req)
                     return recursiveResults

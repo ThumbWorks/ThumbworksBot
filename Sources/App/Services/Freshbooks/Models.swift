@@ -62,8 +62,8 @@ struct WebhookResponseResponse: Codable, Content {
 
 public struct WebhookResponseResult: Codable, Content {
     let perPage: Int
-    let pages: Int
-    let page: Int
+        let pages: Int
+        let page: Int
     let callbacks: [WebhookCallbackResponse]
     enum CodingKeys: String, CodingKey {
         case perPage = "per_page"
