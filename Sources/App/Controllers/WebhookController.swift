@@ -177,12 +177,11 @@ extension WebhookController {
             .flatMap { user  in
                 return user.accountID(on: req)
                     .unwrap(or: UserError.noAccountID)
-                    .flatMap { accountID in
-                        return self.freshbooksService.fetchInvoice(accountID: accountID, invoiceID: triggeredPayload.objectID, accessToken: user.accessToken, req: req)
-                            // map it to a string
-                            .map { self.newInvoiceSlackPayload(from: $0) }
-                            // send it to the service
-                            .flatMap { self.sendToSlack(text: $0, emoji: $1, on: req) }
+                    .flatMap { self.freshbooksService.fetchInvoice(accountID: $0, invoiceID: triggeredPayload.objectID, accessToken: user.accessToken, req: req)
+                        // map it to a string
+                        .map { self.newInvoiceSlackPayload(from: $0) }
+                        // send it to the service
+                        .flatMap { self.sendToSlack(text: $0, emoji: $1, on: req) }
                 }
         }
     }
