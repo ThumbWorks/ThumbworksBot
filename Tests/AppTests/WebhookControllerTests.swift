@@ -62,12 +62,12 @@ class WebhookControllerTests: XCTestCase {
         let membershipPayload = MembershipPayload(id: 1234, role: "manager", business: TestData.business)
         let membership = Membership(membershipPayload: membershipPayload, userID: userID)
 
-        _ = membership.save(on: req.db).flatMap { _ -> EventLoopFuture<Void> in
+        _ = try? membership.save(on: req.db).flatMap { _ -> EventLoopFuture<Void> in
             let business = Business(business: membershipPayload.business)
             return business.save(on: req.db).flatMap { _  in
                 return membership.$businesses.attach(business, on: req.db)
             }
-        }
+        }.wait()
 
         do {
             let _ = try Webhook(webhookID: 123, userID: userID).save(on: req.db).wait()
