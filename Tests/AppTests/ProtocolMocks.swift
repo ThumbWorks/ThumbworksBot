@@ -13,11 +13,11 @@ public class SlackWebServicingMock: SlackWebServicing {
 
 
     public var sendSlackPayloadCallCount = 0
-    public var sendSlackPayloadHandler: ((String, Emoji?, Request) throws -> (EventLoopFuture<ClientResponse>))?
-    public func sendSlackPayload(text: String, with emoji: Emoji?, on req: Request) throws -> EventLoopFuture<ClientResponse> {
+    public var sendSlackPayloadHandler: ((String, Emoji?, Request) -> (EventLoopFuture<ClientResponse>))?
+    public func sendSlackPayload(text: String, with emoji: Emoji?, on req: Request) -> EventLoopFuture<ClientResponse> {
         sendSlackPayloadCallCount += 1
         if let sendSlackPayloadHandler = sendSlackPayloadHandler {
-            return try sendSlackPayloadHandler(text, emoji, req)
+            return sendSlackPayloadHandler(text, emoji, req)
         }
         fatalError("sendSlackPayloadHandler returns can't have a default value thus its handler must be set")
     }

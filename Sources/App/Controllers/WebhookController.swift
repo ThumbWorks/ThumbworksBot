@@ -171,12 +171,7 @@ extension WebhookController {
     }
 
     private func sendToSlack(text: String, emoji: Emoji?, on req: Request) -> EventLoopFuture<HTTPStatus> {
-        do {
-            return try self.slackService.sendSlackPayload(text: text, with:emoji, on: req).transform(to: .ok)
-        }
-        catch {
-            return req.eventLoop.makeFailedFuture(error)
-        }
+        return self.slackService.sendSlackPayload(text: text, with:emoji, on: req).transform(to: .ok)
     }
 
     private func handleInvoiceCreate(on req: Request) throws ->  EventLoopFuture<HTTPStatus> {
