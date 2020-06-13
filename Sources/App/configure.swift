@@ -8,7 +8,7 @@ import QueuesFluentDriver
 public func configure(_ app: Application, dependencies: ApplicationDependencies) throws {
     // Register providers first
     if app.environment == .development {
-        app.databases.use(.postgres(hostname: "localhost", username: "roderic", password: "vapor", database: "vapordev"), as: .psql)
+        app.databases.use(.postgres(hostname: "localhost", username: "roderic", password: "vapor", database: "vapordev1"), as: .psql)
     } else if app.environment == .testing {
         app.databases.use(.postgres(hostname: "localhost", username: "roderic", password: "vapor", database: "vaportest"), as: .psql)
     } else {
@@ -48,9 +48,8 @@ public func configure(_ app: Application, dependencies: ApplicationDependencies)
     app.middleware.use(ErrorMiddleware.default(environment: app.environment))
 
     app.queues.use(.fluent())
-
-    let registerJob = RegisterWebhookJob()
-    app.queues.add(registerJob)
+    app.queues.add(RegisterWebhookJob())
+    app.queues.add(GetInvoiceJob())
     try routes(app, dependencies: dependencies)
 
     try app.queues.startInProcessJobs(on: .default)

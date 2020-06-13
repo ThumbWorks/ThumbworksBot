@@ -98,11 +98,11 @@ public class FreshbooksWebServicingMock: FreshbooksWebServicing {
     }
 
     public var fetchInvoicesCallCount = 0
-    public var fetchInvoicesHandler: ((String, String, Int, Request) throws -> (EventLoopFuture<InvoicesMetaDataContent>))?
-    public func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent> {
+    public var fetchInvoicesHandler: ((String, String, Int, Client) throws -> (EventLoopFuture<InvoicesMetaDataContent>))?
+    public func fetchInvoices(accountID: String, accessToken: String, page: Int, with client: Client) throws -> EventLoopFuture<InvoicesMetaDataContent> {
         fetchInvoicesCallCount += 1
         if let fetchInvoicesHandler = fetchInvoicesHandler {
-            return try fetchInvoicesHandler(accountID, accessToken, page, req)
+            return try fetchInvoicesHandler(accountID, accessToken, page, client)
         }
         fatalError("fetchInvoicesHandler returns can't have a default value thus its handler must be set")
     }

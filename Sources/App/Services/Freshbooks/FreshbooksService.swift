@@ -56,7 +56,7 @@ public protocol FreshbooksWebServicing {
     func fetchClient(accountID: String, clientID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<ClientContent>
     func fetchPayment(accountID: String, paymentID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<PaymentContent>
     func fetchUser(accessToken: String, on req: Request) throws -> EventLoopFuture<UserResponseObject>
-    func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent>
+    func fetchInvoices(accountID: String, accessToken: String, page: Int, with client: Client) throws -> EventLoopFuture<InvoicesMetaDataContent>
     func confirmWebhook(accessToken: String, on req: Request) throws -> EventLoopFuture<Void>
     func auth(with code: String, on req: Request) throws -> EventLoopFuture<TokenExchangeResponse>
 }
@@ -78,7 +78,6 @@ class FreshbooksHeaderProvider {
 // MARK: - FreshbooksWebServicing public facing
 public final class FreshbooksWebservice: FreshbooksWebServicing {
 
-
     let clientSecret: String
     let clientID: String
     let hostname: String
@@ -92,29 +91,29 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
     public func fetchClient(accountID: String, clientID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<ClientContent> {
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
         let url = URI.client(accountID: accountID, clientID: clientID)
-        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: ClientPayload.self, on: req)
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: ClientPayload.self, with: req.client)
             .map { $0.response.result.client }
     }
 
     public func fetchPayment(accountID: String, paymentID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<PaymentContent> {
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
         let url = URI.payment(accountID: accountID, paymentID: paymentID)
-        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: PaymentPayload.self, on: req) 
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: PaymentPayload.self, with: req.client)
             .map { $0.response.result.payment }
     }
 
     // An attempt was made to add this call with a job
-    public func fetchInvoices(accountID: String, accessToken: String, page: Int, on req: Request) throws -> EventLoopFuture<InvoicesMetaDataContent> {
+    public func fetchInvoices(accountID: String, accessToken: String, page: Int, with client: Client) throws -> EventLoopFuture<InvoicesMetaDataContent> {
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
         let url = URI.invoices(accountID: accountID, page: page)
-        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: InvoicesPackage.self, on: req)
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: InvoicesPackage.self, with: client)
             .map { $0.response.result }
     }
 
     public func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) throws -> EventLoopFuture<InvoiceContent> {
         let url = URI.invoice(accountID: accountID, invoiceID: invoiceID)
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: InvoicePackage.self, on: req)
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: InvoicePackage.self, with: req.client)
             .map { $0.response.result.invoice }
     }
 
@@ -159,7 +158,7 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
     public func fetchWebhooks(accountID: String, accessToken: String, page: Int, req: Request) throws -> EventLoopFuture<WebhookResponseResult> {
         let url = URI.eventCallbacks(accountID: accountID, page: page)
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
-        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: WebhookResponsePayload.self, on: req)
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: WebhookResponsePayload.self, with: req.client)
             .map { $0.response.result }
     }
 
@@ -170,7 +169,7 @@ public final class FreshbooksWebservice: FreshbooksWebServicing {
     public func fetchUser(accessToken: String, on req: Request)  throws ->  EventLoopFuture<UserResponseObject> {
         let provider = FreshbooksHeaderProvider(accessToken: accessToken)
         let url = URI.freshbooksUser
-        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: UserFetchResponsePayload.self, on: req)
+        return try genericRequest(method: .GET, url: url, headers: provider.headers(), returnType: UserFetchResponsePayload.self, with: req.client)
             .map { $0.response }
     }
 }
@@ -199,8 +198,7 @@ private extension FreshbooksWebservice {
      - Parameter returnType: The content type of which we are expecting a return
      - Parameter req: The Vapor Request object on which we will perform this request
      */
-    private func genericRequest<T: Content>(method: HTTPMethod, url: URI, headers:  HTTPHeaders, returnType: T.Type, on req: Request) throws -> EventLoopFuture<T> {
-        let client = req.client
+    private func genericRequest<T: Content>(method: HTTPMethod, url: URI, headers:  HTTPHeaders, returnType: T.Type, with client: Client) throws -> EventLoopFuture<T> {
         return client.send(method, headers: headers, to: url)
             .flatMapThrowing { clientResponse  in
                 do {

@@ -38,7 +38,10 @@ public func routes(_ app: Application, dependencies: ApplicationDependencies) th
 
     let userSessionAuthenticator = UserSessionAuthenticator { dependencies.authenticationClosure($0, $1) }
 
-    let freshbooksController = FreshbooksController(freshbooksService: dependencies.freshbooksServicing,
+    let freshbooksController = FreshbooksController(hostname: dependencies.hostname,
+                                                    clientSecret: dependencies.clientSecret,
+                                                    clientID: dependencies.clientID,
+                                                    freshbooksService: dependencies.freshbooksServicing,
                                                     app: app,
                                                     userSessionAuthenticator: userSessionAuthenticator)
     let webhookController = WebhookController(hostName: dependencies.hostname,

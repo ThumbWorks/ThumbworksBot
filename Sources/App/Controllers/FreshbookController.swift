@@ -13,8 +13,14 @@ final class FreshbooksController {
     let app: Application
     let freshbooksService: FreshbooksWebServicing
     let userSessionAuthenticator: UserSessionAuthenticator
-    init(freshbooksService: FreshbooksWebServicing, app: Application, userSessionAuthenticator: UserSessionAuthenticator) {
+    let hostname: String
+    let clientID: String
+    let clientSecret: String
+    init(hostname: String, clientSecret: String, clientID: String, freshbooksService: FreshbooksWebServicing, app: Application, userSessionAuthenticator: UserSessionAuthenticator) {
         self.freshbooksService = freshbooksService
+        self.hostname = hostname
+        self.clientID = clientID
+        self.clientSecret = clientSecret
         self.app = app
         self.userSessionAuthenticator = userSessionAuthenticator
     }
@@ -69,45 +75,17 @@ final class FreshbooksController {
     }
 
     func getInvoices(_ req: Request) throws -> EventLoopFuture<HTTPStatus> {
-        // TODO this should probably be a job, if the payload suggests that there is more to be fetched, add a new job.
         let user = try req.auth.require(User.self)
         return user.accountID(on: req)
             .unwrap(or: UserError.noAccountID)
             .flatMap { accountID in
-                do {                    
-                    let saveIncrementalsClosure: ([InvoiceContent]) -> () = { invoiceContents in
-                        invoiceContents.forEach { content in
-                            print("saving \(content.freshbooksID) from \(content.createdAt)")
-                            let invoice = content.invoice()
-                            _ = invoice.save(on: req.db)
-                        }
-                    }
-                    let recursiveResults = try self.recursiveFetchInvoices(page: 1,
-                                                                           accountID: accountID,
-                                                                           accessToken: user.accessToken,
-                                                                           onIncremental: saveIncrementalsClosure,
-                                                                           on: req)
-                    return recursiveResults
-                        .transform(to: HTTPStatus.ok)
-                } catch {
-                    return req.eventLoop.makeFailedFuture(error)
-                }
-        }
-    }
-
-    private func recursiveFetchInvoices(page: Int, accountID: String, accessToken: String, onIncremental: @escaping ([InvoiceContent]) -> (), on req: Request) throws -> EventLoopFuture<[InvoiceContent]>  {
-        return try self.freshbooksService
-            .fetchInvoices(accountID: accountID, accessToken: accessToken, page: page, on: req).flatMap { metaData in
-                let theseInvoices = req.eventLoop.makeSucceededFuture(metaData.invoices)
-                theseInvoices.whenSuccess { onIncremental($0) }
-                do {
-                    if metaData.pages > page {
-                        return try self.recursiveFetchInvoices(page: page + 1, accountID: accountID, accessToken: accessToken, onIncremental: onIncremental, on: req)
-                    }
-                    return theseInvoices
-                }  catch {
-                    return req.eventLoop.makeFailedFuture(error)
-                }
+                let payload = GetInvoicePayload(accountID: accountID,
+                                                accessToken:user.accessToken,
+                                                page: 1,
+                                                hostname: self.hostname,
+                                                clientID: self.clientID,
+                                                clientSecret: self.clientSecret)
+                return req.queue.dispatch(GetInvoiceJob.self, payload).transform(to: HTTPStatus.ok)
         }
     }
 }
