@@ -38,13 +38,12 @@ final class FreshbooksController {
         req.session.data["accessToken"] = codeContainer.code
         return .ok
     }
-
+    
     func freshbooksAuth(_ req: Request) throws -> EventLoopFuture<View> {
         let codeContainer = try req.query.decode(AuthRequest.self)
-        return try freshbooksService.auth(with: codeContainer.code, on: req)
+        return freshbooksService.auth(with: codeContainer.code, on: req)
             .flatMap({ (tokenResponse) -> EventLoopFuture<View> in
-            do {
-                return try self.freshbooksService
+                return self.freshbooksService
                     .fetchUser(accessToken: tokenResponse.accessToken, on: req)
                     .flatMap { userResponseObject -> EventLoopFuture<Void> in
                         return User.query(on: req.db)
@@ -68,10 +67,7 @@ final class FreshbooksController {
                         }
                 }
                 .flatMap { _ in req.view.render("SetCookie") }
-            } catch {
-                return req.eventLoop.makeFailedFuture(error)
-            }
-        })
+            })
     }
 
     func getInvoices(_ req: Request) throws -> EventLoopFuture<HTTPStatus> {

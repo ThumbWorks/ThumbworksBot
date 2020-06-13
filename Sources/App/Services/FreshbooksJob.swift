@@ -29,22 +29,17 @@ struct RegisterWebhookJob: Job {
                                            clientID: payload.clientID,
                                            clientSecret: payload.clientSecret)
         let user = payload.user
-        do {
-            return try service.registerNewWebhook(accountID: payload.accountID,
-                                                  accessToken: payload.accessToken,
-                                                  type: payload.type,
-                                                  with: context.application.client)
-                .flatMap {
-                    do {
-                        return Webhook(webhookID: $0.callbackid, userID: try user.requireID())
-                            .save(on: context.application.db)
-                    } catch {
-                        return context.eventLoop.makeFailedFuture(error)
-                    }
-            }
-        }  catch {
-            return context.eventLoop.makeFailedFuture(error)
-
+        return service.registerNewWebhook(accountID: payload.accountID,
+                                          accessToken: payload.accessToken,
+                                          type: payload.type,
+                                          with: context.application.client)
+            .flatMap {
+                do {
+                    return Webhook(webhookID: $0.callbackid, userID: try user.requireID())
+                        .save(on: context.application.db)
+                } catch {
+                    return context.eventLoop.makeFailedFuture(error)
+                }
         }
     }
     static func serializePayload(_ payload: WebhookType) throws -> [UInt8] {
@@ -73,32 +68,27 @@ struct GetInvoiceJob: Job {
         let service = FreshbooksWebservice(hostname: payload.hostname,
                                            clientID: payload.clientID,
                                            clientSecret: payload.clientSecret)
-
-        do {
-            return try service.fetchInvoices(accountID: payload.accountID,
-                                             accessToken: payload.accessToken,
-                                             page: payload.page,
-                                             with: context.application.client)
-                .flatMapThrowing { metaData in
-                    let currentPage = metaData.page
-                    let totalPages = metaData.pages
-                    if currentPage < totalPages {
-                        print("fetch \(currentPage + 1)")
-                        let payload = GetInvoicePayload(accountID: payload.accountID,
-                                                        accessToken:payload.accessToken,
-                                                        page: currentPage + 1,
-                                                        hostname: payload.hostname,
-                                                        clientID: payload.clientID,
-                                                        clientSecret: payload.clientSecret)
-                        _ = context.application.queues.queue.dispatch(GetInvoiceJob.self, payload)
-                    }
-                    // save these invoices
-                    metaData.invoices.forEach { content in
-                        _ = content.invoice().save(on: context.application.db)
-                    }
-            }
-        } catch {
-            return context.eventLoop.makeFailedFuture(error)
+        return service.fetchInvoices(accountID: payload.accountID,
+                                     accessToken: payload.accessToken,
+                                     page: payload.page,
+                                     with: context.application.client)
+            .flatMapThrowing { metaData in
+                let currentPage = metaData.page
+                let totalPages = metaData.pages
+                if currentPage < totalPages {
+                    print("fetch \(currentPage + 1)")
+                    let payload = GetInvoicePayload(accountID: payload.accountID,
+                                                    accessToken:payload.accessToken,
+                                                    page: currentPage + 1,
+                                                    hostname: payload.hostname,
+                                                    clientID: payload.clientID,
+                                                    clientSecret: payload.clientSecret)
+                    _ = context.application.queues.queue.dispatch(GetInvoiceJob.self, payload)
+                }
+                // save these invoices
+                metaData.invoices.forEach { content in
+                    _ = content.invoice().save(on: context.application.db)
+                }
         }
     }
 }

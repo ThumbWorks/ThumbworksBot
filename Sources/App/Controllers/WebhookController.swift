@@ -96,19 +96,14 @@ final public  class WebhookController {
 
         return user.accountID(on: req)
             .unwrap(or: UserError.noAccountID)
-            .flatMap { accountID in
-                do {
-                    return try self.freshbooksService.deleteWebhook(accountID: accountID, webhookID: webhookID, on: req)
-                        .flatMap { _ in
-                            Webhook.query(on: req.db)
-                                .filter(\.$webhookID, .equal, webhookID)
-                                .first()
-                                .unwrap(or: WebhookError.webhookNotFound)
-                                .flatMap { $0.delete(on: req.db) }
-                    }.transform(to: req.redirect(to: "/webhooks"))
-                } catch {
-                    return req.eventLoop.makeFailedFuture(error)
-                }
+            .flatMap { self.freshbooksService.deleteWebhook(accountID: $0, webhookID: webhookID, on: req)
+                .flatMap { _ in
+                    Webhook.query(on: req.db)
+                        .filter(\.$webhookID, .equal, webhookID)
+                        .first()
+                        .unwrap(or: WebhookError.webhookNotFound)
+                        .flatMap { $0.delete(on: req.db) }
+            }.transform(to: req.redirect(to: "/webhooks"))
         }
     }
 
@@ -155,7 +150,7 @@ final public  class WebhookController {
             .flatMap { accountID in
                 do {
                     let page = try req.query.decode(WebhookRequestPayload.self).page ?? 1
-                    return try self.freshbooksService.fetchWebhooks(accountID: accountID,
+                    return self.freshbooksService.fetchWebhooks(accountID: accountID,
                                                                     accessToken: accessToken,
                                                                     page: page,
                                                                     req: req)
@@ -193,15 +188,11 @@ extension WebhookController {
                 return user.accountID(on: req)
                     .unwrap(or: UserError.noAccountID)
                     .flatMap { accountID in
-                        do {
-                            return try self.freshbooksService.fetchInvoice(accountID: accountID, invoiceID: triggeredPayload.objectID, accessToken: user.accessToken, req: req)
-                                // map it to a string
-                                .map { self.newInvoiceSlackPayload(from: $0) }
-                                // send it to the service
-                                .flatMap { self.sendToSlack(text: $0, emoji: $1, on: req) }
-                        } catch {
-                            return req.eventLoop.makeFailedFuture(error)
-                        }
+                        return self.freshbooksService.fetchInvoice(accountID: accountID, invoiceID: triggeredPayload.objectID, accessToken: user.accessToken, req: req)
+                            // map it to a string
+                            .map { self.newInvoiceSlackPayload(from: $0) }
+                            // send it to the service
+                            .flatMap { self.sendToSlack(text: $0, emoji: $1, on: req) }
                 }
         }
     }
@@ -214,15 +205,9 @@ extension WebhookController {
             .flatMap { user  in
                 return user.accountID(on: req)
                     .unwrap(or: UserError.noAccountID)
-                    .flatMap { accountID in
-                        do {
-                            let objectID = triggeredPayload.objectID
-                            return try self.freshbooksService.fetchPayment(accountID: accountID, paymentID: objectID, accessToken: user.accessToken, req: req)
-                                .map { self.newPaymentSlackPayload(from: $0) }
-                                .flatMap { self.sendToSlack(text: $0, emoji: nil, on: req) }
-                        } catch {
-                            return req.eventLoop.makeFailedFuture(error)
-                        }
+                    .flatMap { self.freshbooksService.fetchPayment(accountID: $0, paymentID: triggeredPayload.objectID, accessToken: user.accessToken, req: req)
+                        .map { self.newPaymentSlackPayload(from: $0) }
+                        .flatMap { self.sendToSlack(text: $0, emoji: nil, on: req) }
                 }
         }
     }
@@ -235,18 +220,13 @@ extension WebhookController {
                    .flatMap { user  in
                        return user.accountID(on: req)
                            .unwrap(or: UserError.noAccountID)
-                           .flatMap { accountID in
-                               do {
-                                let objectID = triggeredPayload.objectID
-                                return try self.freshbooksService.fetchClient(accountID: accountID, clientID: objectID, accessToken: user.accessToken, req: req)
-                                    .map { self.newClientSlackPayload(from: $0) }
-                                    .flatMap { self.sendToSlack(text: $0, emoji: $1, on: req) }
-                               } catch {
-                                   return req.eventLoop.makeFailedFuture(error)
-                               }
+                           .flatMap { self.freshbooksService.fetchClient(accountID: $0, clientID: triggeredPayload.objectID, accessToken: user.accessToken, req: req)
+                                .map { self.newClientSlackPayload(from: $0) }
+                                .flatMap { self.sendToSlack(text: $0, emoji: $1, on: req) }
                        }
                }
     }
+
     private func executeWebhook(on req: Request) throws ->  EventLoopFuture<HTTPStatus> {
         let triggeredPayload = try req.content.decode(FreshbooksWebhookTriggeredContent.self)
         let type = WebhookType(rawValue: triggeredPayload.name)
@@ -265,6 +245,7 @@ extension WebhookController {
     }
 
     private func verifyWebhook(webhookID: Int, on req: Request) throws ->  EventLoopFuture<HTTPStatus> {
+        let payload = try req.content.decode(FreshbooksWebhookTriggeredContent.self)
         return Webhook
             .query(on: req.db)
             .filter(\.$webhookID, .equal, webhookID)
@@ -273,13 +254,12 @@ extension WebhookController {
             .flatMap { User.find($0.userID, on: req.db) }
             .unwrap(or: WebhookError.orphanedWebhook)
             .flatMap { user in
-                do {
-                    return try self.freshbooksService
-                        .confirmWebhook(accessToken: user.accessToken, on: req)
-                        .transform(to: .ok)
-                } catch {
-                    return req.eventLoop.makeFailedFuture(error)
-                }
+                return self.freshbooksService.confirmWebhook(accessToken: user.accessToken,
+                                                             accountID: payload.accountID,
+                                                             objectID: payload.objectID,
+                                                             verifier: payload.verifier!,
+                                                             on: req)
+                    .transform(to: .ok)
         }
     }
 }

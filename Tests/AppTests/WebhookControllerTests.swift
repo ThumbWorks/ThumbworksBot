@@ -195,7 +195,7 @@ class WebhookControllerTests: XCTestCase {
         let req = Request(application: application, on: application.eventLoopGroup.next())
 
         // Verify that we are able to fetch the user from the database and the access token set is being sent to confirm webhook
-        freshbooks.confirmWebhookHandler = { token, request in
+        freshbooks.confirmWebhookHandler = { token, _, _, _, request in
             XCTAssertEqual(token, TestData.userAccessToken)
             return request.successPromiseVoid()
         }
