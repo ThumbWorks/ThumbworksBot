@@ -140,6 +140,7 @@ final public  class WebhookController {
     func allWebhooks(_ req: Request) throws -> EventLoopFuture<WebhookResponseResult> {
         let user = try req.auth.require(User.self)
         let accessToken = user.accessToken
+        let page = try req.query.decode(WebhookRequestPayload.self).page ?? 1
         return Business
             .query(on: req.db)
             .filter(\.$accountID, .notEqual, nil)
@@ -147,16 +148,10 @@ final public  class WebhookController {
             .unwrap(or: Abort(.notFound))
             .map { $0.accountID }
             .unwrap(or: BusinessError.businessNotFound)
-            .flatMap { accountID in
-                do {
-                    let page = try req.query.decode(WebhookRequestPayload.self).page ?? 1
-                    return self.freshbooksService.fetchWebhooks(accountID: accountID,
-                                                                    accessToken: accessToken,
-                                                                    page: page,
-                                                                    req: req)
-                } catch {
-                    return req.eventLoop.makeFailedFuture(error)
-                }
+            .flatMap { self.freshbooksService.fetchWebhooks(accountID: $0,
+                                                            accessToken: accessToken,
+                                                            page: page,
+                                                            req: req)
         }
     }
 }
