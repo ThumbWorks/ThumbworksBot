@@ -26,6 +26,10 @@ public func configure(_ app: Application, dependencies: ApplicationDependencies)
     app.migrations.add(JobModelMigrate())
     app.sessions.use(.fluent(.psql))
 
+    app.queues.use(.fluent())
+    app.queues.add(RegisterWebhookJob())
+    app.queues.add(GetInvoiceJob())
+    
     app.migrations.add(SessionRecord.migration)
     
     try app.autoMigrate().wait()
@@ -47,9 +51,7 @@ public func configure(_ app: Application, dependencies: ApplicationDependencies)
 
     app.middleware.use(ErrorMiddleware.default(environment: app.environment))
 
-    app.queues.use(.fluent())
-    app.queues.add(RegisterWebhookJob())
-    app.queues.add(GetInvoiceJob())
+
     try routes(app, dependencies: dependencies)
 
     try app.queues.startInProcessJobs(on: .default)
