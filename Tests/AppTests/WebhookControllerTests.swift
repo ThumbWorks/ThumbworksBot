@@ -123,7 +123,7 @@ class WebhookControllerTests: XCTestCase {
                                                                       accountID: TestData.business.accountID ?? "booo")
         try req.content.encode(executeWebhookPayload)
         // setup fetch payment handler
-        freshbooks.fetchPaymentHandler = { accountID, paymentID, accessToken, request in
+        freshbooks.fetchPaymentHandler = { _, _, request in
             return request.successPromisePaymentContent()
         }
 
@@ -175,7 +175,7 @@ class WebhookControllerTests: XCTestCase {
           }
 
 
-        freshbooks.fetchClientHandler = { _, _, _, request in
+        freshbooks.fetchClientHandler = { _, _, request in
             return request.successPromiseClientContentResponse()
         }
         try? req.content.encode(TestData.clientCreateWebhookContent)
@@ -223,9 +223,9 @@ class WebhookControllerTests: XCTestCase {
     func testDeleteWebhook() throws {
         let req = Request(application: application, on: application.eventLoopGroup.next())
         print(req.auth.login(testUser!))
-        freshbooks.deleteWebhookHandler = { userID, webhookID, request in
+        freshbooks.deleteWebhookHandler = { creds, webhookID, request in
             XCTAssertNotNil(TestData.business.accountID)
-            XCTAssertEqual(TestData.business.accountID, userID)
+            XCTAssertEqual(TestData.business.accountID, creds.accountID)
             return request.successPromiseVoid()
         }
         let userAuthenticator = UserSessionAuthenticator(authenticationClosure: deps.authenticationClosure)

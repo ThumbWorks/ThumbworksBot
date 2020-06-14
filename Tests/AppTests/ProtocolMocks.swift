@@ -28,61 +28,61 @@ public class FreshbooksWebServicingMock: FreshbooksWebServicing {
 
 
     public var deleteWebhookCallCount = 0
-    public var deleteWebhookHandler: ((String, Int, Request) -> (EventLoopFuture<Void>))?
-    public func deleteWebhook(accountID: String, webhookID: Int, on req: Request) -> EventLoopFuture<Void> {
+    public var deleteWebhookHandler: ((AccountCredentials, Int, Request) -> (EventLoopFuture<Void>))?
+    public func deleteWebhook(credentials: AccountCredentials, webhookID: Int, on req: Request) -> EventLoopFuture<Void> {
         deleteWebhookCallCount += 1
         if let deleteWebhookHandler = deleteWebhookHandler {
-            return deleteWebhookHandler(accountID, webhookID, req)
+            return deleteWebhookHandler(credentials, webhookID, req)
         }
         fatalError("deleteWebhookHandler returns can't have a default value thus its handler must be set")
     }
 
     public var registerNewWebhookCallCount = 0
-    public var registerNewWebhookHandler: ((String, String, WebhookType, Client) -> (EventLoopFuture<NewWebhookPayloadCallback>))?
-    public func registerNewWebhook(accountID: String, accessToken: String, type: WebhookType, with client: Client) -> EventLoopFuture<NewWebhookPayloadCallback> {
+    public var registerNewWebhookHandler: ((AccountCredentials, WebhookType, Client) -> (EventLoopFuture<NewWebhookPayloadCallback>))?
+    public func registerNewWebhook(credentials: AccountCredentials, type: WebhookType, with client: Client) -> EventLoopFuture<NewWebhookPayloadCallback> {
         registerNewWebhookCallCount += 1
         if let registerNewWebhookHandler = registerNewWebhookHandler {
-            return registerNewWebhookHandler(accountID, accessToken, type, client)
+            return registerNewWebhookHandler(credentials, type, client)
         }
         fatalError("registerNewWebhookHandler returns can't have a default value thus its handler must be set")
     }
 
     public var fetchWebhooksCallCount = 0
-    public var fetchWebhooksHandler: ((String, String, Int, Request) -> (EventLoopFuture<WebhookResponseResult>))?
-    public func fetchWebhooks(accountID: String, accessToken: String, page: Int, req: Request) -> EventLoopFuture<WebhookResponseResult> {
+    public var fetchWebhooksHandler: ((AccountCredentials, Int, Request) -> (EventLoopFuture<WebhookResponseResult>))?
+    public func fetchWebhooks(credentials: AccountCredentials, page: Int, req: Request) -> EventLoopFuture<WebhookResponseResult> {
         fetchWebhooksCallCount += 1
         if let fetchWebhooksHandler = fetchWebhooksHandler {
-            return fetchWebhooksHandler(accountID, accessToken, page, req)
+            return fetchWebhooksHandler(credentials, page, req)
         }
         fatalError("fetchWebhooksHandler returns can't have a default value thus its handler must be set")
     }
 
     public var fetchInvoiceCallCount = 0
-    public var fetchInvoiceHandler: ((String, Int, String, Request) -> (EventLoopFuture<InvoiceContent>))?
-    public func fetchInvoice(accountID: String, invoiceID: Int, accessToken: String, req: Request) -> EventLoopFuture<InvoiceContent> {
+    public var fetchInvoiceHandler: ((AccountCredentials, Int, Request) -> (EventLoopFuture<InvoiceContent>))?
+    public func fetchInvoice(credentials: AccountCredentials, invoiceID: Int, req: Request) -> EventLoopFuture<InvoiceContent> {
         fetchInvoiceCallCount += 1
         if let fetchInvoiceHandler = fetchInvoiceHandler {
-            return fetchInvoiceHandler(accountID, invoiceID, accessToken, req)
+            return fetchInvoiceHandler(credentials, invoiceID, req)
         }
         fatalError("fetchInvoiceHandler returns can't have a default value thus its handler must be set")
     }
 
     public var fetchClientCallCount = 0
-    public var fetchClientHandler: ((String, Int, String, Request) -> (EventLoopFuture<ClientContent>))?
-    public func fetchClient(accountID: String, clientID: Int, accessToken: String, req: Request) -> EventLoopFuture<ClientContent> {
+    public var fetchClientHandler: ((AccountCredentials, Int, Request) -> (EventLoopFuture<ClientContent>))?
+    public func fetchClient(credentials: AccountCredentials, clientID: Int, req: Request) -> EventLoopFuture<ClientContent> {
         fetchClientCallCount += 1
         if let fetchClientHandler = fetchClientHandler {
-            return fetchClientHandler(accountID, clientID, accessToken, req)
+            return fetchClientHandler(credentials, clientID, req)
         }
         fatalError("fetchClientHandler returns can't have a default value thus its handler must be set")
     }
 
     public var fetchPaymentCallCount = 0
-    public var fetchPaymentHandler: ((String, Int, String, Request) -> (EventLoopFuture<PaymentContent>))?
-    public func fetchPayment(accountID: String, paymentID: Int, accessToken: String, req: Request) -> EventLoopFuture<PaymentContent> {
+    public var fetchPaymentHandler: ((AccountCredentials, Int, Request) -> (EventLoopFuture<PaymentContent>))?
+    public func fetchPayment(credentials: AccountCredentials, paymentID: Int, req: Request) -> EventLoopFuture<PaymentContent> {
         fetchPaymentCallCount += 1
         if let fetchPaymentHandler = fetchPaymentHandler {
-            return fetchPaymentHandler(accountID, paymentID, accessToken, req)
+            return fetchPaymentHandler(credentials, paymentID, req)
         }
         fatalError("fetchPaymentHandler returns can't have a default value thus its handler must be set")
     }
@@ -98,11 +98,11 @@ public class FreshbooksWebServicingMock: FreshbooksWebServicing {
     }
 
     public var fetchInvoicesCallCount = 0
-    public var fetchInvoicesHandler: ((String, String, Int, Client) -> (EventLoopFuture<InvoicesMetaDataContent>))?
-    public func fetchInvoices(accountID: String, accessToken: String, page: Int, with client: Client) -> EventLoopFuture<InvoicesMetaDataContent> {
+    public var fetchInvoicesHandler: ((AccountCredentials, Int, Client) -> (EventLoopFuture<InvoicesMetaDataContent>))?
+    public func fetchInvoices(credentials: AccountCredentials, page: Int, with client: Client) -> EventLoopFuture<InvoicesMetaDataContent> {
         fetchInvoicesCallCount += 1
         if let fetchInvoicesHandler = fetchInvoicesHandler {
-            return fetchInvoicesHandler(accountID, accessToken, page, client)
+            return fetchInvoicesHandler(credentials, page, client)
         }
         fatalError("fetchInvoicesHandler returns can't have a default value thus its handler must be set")
     }

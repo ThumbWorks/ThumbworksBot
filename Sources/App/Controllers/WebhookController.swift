@@ -93,10 +93,9 @@ final public  class WebhookController {
     func deleteWebhook(_ req: Request) throws -> EventLoopFuture<Response> {
         let user = try req.auth.require(User.self)
         let webhookID = try req.query.decode(DeleteWebhookRequestPayload.self).id
-
         return user.accountID(on: req)
             .unwrap(or: UserError.noAccountID)
-            .flatMap { self.freshbooksService.deleteWebhook(accountID: $0, webhookID: webhookID, on: req)
+            .flatMap { self.freshbooksService.deleteWebhook(credentials: .init(accountID: $0, accessToken: user.accessToken),  webhookID: webhookID, on: req)
                 .flatMap { _ in
                     Webhook.query(on: req.db)
                         .filter(\.$webhookID, .equal, webhookID)
@@ -139,7 +138,6 @@ final public  class WebhookController {
     /// JSON describing the user's webhooks
     func allWebhooks(_ req: Request) throws -> EventLoopFuture<WebhookResponseResult> {
         let user = try req.auth.require(User.self)
-        let accessToken = user.accessToken
         let page = try req.query.decode(WebhookRequestPayload.self).page ?? 1
         return Business
             .query(on: req.db)
@@ -148,8 +146,7 @@ final public  class WebhookController {
             .unwrap(or: Abort(.notFound))
             .map { $0.accountID }
             .unwrap(or: BusinessError.businessNotFound)
-            .flatMap { self.freshbooksService.fetchWebhooks(accountID: $0,
-                                                            accessToken: accessToken,
+            .flatMap { self.freshbooksService.fetchWebhooks(credentials: .init(accountID: $0, accessToken: user.accessToken),
                                                             page: page,
                                                             req: req)
         }
@@ -177,7 +174,7 @@ extension WebhookController {
             .flatMap { user  in
                 return user.accountID(on: req)
                     .unwrap(or: UserError.noAccountID)
-                    .flatMap { self.freshbooksService.fetchInvoice(accountID: $0, invoiceID: triggeredPayload.objectID, accessToken: user.accessToken, req: req)
+                    .flatMap { self.freshbooksService.fetchInvoice(credentials: .init(accountID: $0, accessToken: user.accessToken), invoiceID: triggeredPayload.objectID, req: req)
                         // map it to a string
                         .map { self.newInvoiceSlackPayload(from: $0) }
                         // send it to the service
@@ -194,7 +191,7 @@ extension WebhookController {
             .flatMap { user  in
                 return user.accountID(on: req)
                     .unwrap(or: UserError.noAccountID)
-                    .flatMap { self.freshbooksService.fetchPayment(accountID: $0, paymentID: triggeredPayload.objectID, accessToken: user.accessToken, req: req)
+                    .flatMap { self.freshbooksService.fetchPayment(credentials: .init(accountID: $0, accessToken: user.accessToken), paymentID: triggeredPayload.objectID, req: req)
                         .map { self.newPaymentSlackPayload(from: $0) }
                         .flatMap { self.sendToSlack(text: $0, emoji: nil, on: req) }
                 }
@@ -209,7 +206,7 @@ extension WebhookController {
                    .flatMap { user  in
                        return user.accountID(on: req)
                            .unwrap(or: UserError.noAccountID)
-                           .flatMap { self.freshbooksService.fetchClient(accountID: $0, clientID: triggeredPayload.objectID, accessToken: user.accessToken, req: req)
+                           .flatMap { self.freshbooksService.fetchClient(credentials: .init(accountID: $0, accessToken: user.accessToken), clientID: triggeredPayload.objectID, req: req)
                                 .map { self.newClientSlackPayload(from: $0) }
                                 .flatMap { self.sendToSlack(text: $0, emoji: $1, on: req) }
                        }

@@ -29,8 +29,7 @@ struct RegisterWebhookJob: Job {
                                            clientID: payload.clientID,
                                            clientSecret: payload.clientSecret)
         let user = payload.user
-        return service.registerNewWebhook(accountID: payload.accountID,
-                                          accessToken: payload.accessToken,
+        return service.registerNewWebhook(credentials: .init(accountID: payload.accountID, accessToken: user.accessToken),
                                           type: payload.type,
                                           with: context.application.client)
             .flatMap {
@@ -68,8 +67,7 @@ struct GetInvoiceJob: Job {
         let service = FreshbooksWebservice(hostname: payload.hostname,
                                            clientID: payload.clientID,
                                            clientSecret: payload.clientSecret)
-        return service.fetchInvoices(accountID: payload.accountID,
-                                     accessToken: payload.accessToken,
+        return service.fetchInvoices(credentials: .init(accountID: payload.accountID, accessToken: payload.accessToken),
                                      page: payload.page,
                                      with: context.application.client)
             .flatMapThrowing { metaData in

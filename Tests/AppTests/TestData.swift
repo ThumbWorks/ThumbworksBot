@@ -11,9 +11,9 @@ import XCTVapor
 
 
 class FreshbooksWebServicingMockWithDefaultHandlers: FreshbooksWebServicingMock {
-    override var fetchInvoiceHandler: ((String, Int, String, Request) -> (EventLoopFuture<InvoiceContent>))? {
+    override var fetchInvoiceHandler: ((AccountCredentials, Int, Request) -> (EventLoopFuture<InvoiceContent>))? {
         get {
-            return { _, _, _, request in
+            return { _, _, request in
                 let promise = request.eventLoop.makePromise(of: InvoiceContent.self)
                 DispatchQueue.global().async {
                     promise.succeed(TestData.invoice)
@@ -52,9 +52,9 @@ class FreshbooksWebServicingMockWithDefaultHandlers: FreshbooksWebServicingMock 
         set {}
     }
 
-    override var registerNewWebhookHandler: ((String, String, WebhookType, Client) -> (EventLoopFuture<NewWebhookPayloadCallback>))? {
+    override var registerNewWebhookHandler: ((AccountCredentials, WebhookType, Client) -> (EventLoopFuture<NewWebhookPayloadCallback>))? {
         get {
-            return { _, _, _, request in
+            return { _, _, request in
                 let promise = request.eventLoop.makePromise(of: NewWebhookPayloadCallback.self)
                 DispatchQueue.global().async {
                     promise.succeed(TestData.newWebhookResponse)
